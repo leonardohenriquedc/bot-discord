@@ -1,27 +1,33 @@
 ### Builder Image ###
 FROM rust:1.82-alpine AS builder
 
-# Install dependencies
-RUN apk add --update \
+# Install build dependencies
+RUN apk add --update --no-cache \
     alpine-sdk \
-    ffmpeg \
-    yt-dlp \
     pkgconfig \
     cmake \
     musl-dev \
     openssl \
     libressl-dev
 
-# Create a new project to hold the bot using cargo
-RUN USER=root cargo new --bin poor-jimmy
-
-# Set the new project directory as the working directory
 WORKDIR /poor-jimmy
 
-# Copy the project into the builder image
-COPY . .
+# Copy manifests first to cache dependency builds
+COPY Cargo.toml Cargo.lock ./
 
-# Build the bot
+# Create a dummy main.rs to build dependencies
+RUN mkdir src && \
+    echo "fn main() {}" > src/main.rs && \
+    cargo build --release && \
+    rm -rf src
+
+# Now copy the actual source code
+COPY src ./src
+
+# Touch source files to ensure cargo detects changes and rebuilds
+RUN find src -type f -exec touch {} +
+
+# Build the actual bot (dependencies are cached, only app code rebuilds)
 RUN cargo build --release
 
 ### Final Image ###
@@ -29,21 +35,17 @@ RUN cargo build --release
 # and all the dependencies it needs. We leave behind all the build tools.
 FROM alpine:latest
 
-# Install dependencies to run the bot
-RUN apk add --update \
-    alpine-sdk \
+# Install only runtime dependencies
+RUN apk add --update --no-cache \
     ffmpeg \
     yt-dlp \
-    pkgconfig \
-    cmake \
-    musl-dev \
-    openssl \
-    libressl-dev
+    libgcc \
+    ca-certificates
 
 # Set the working directory for where the binary will live
 WORKDIR /bot
 
-# Copy the binary to our final image
+# Copy the release binary to our final image
 COPY --from=builder /poor-jimmy/target/release/poor-jimmy ./
 
 # Command to start the bot once the container starts
