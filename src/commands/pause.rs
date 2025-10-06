@@ -54,7 +54,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
                             command,
                             &ctx.http,
                             format!("Song **paused!** Use **/resume** to continue playback"),
-                            true,
+                            false,
                         )
                         .await;
                     }
@@ -79,7 +79,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
                     command,
                     &ctx.http,
                     format!("The song is currently paused!"),
-                    true,
+                    false,
                 )
                 .await;
             }
@@ -141,7 +141,7 @@ pub async fn handle_button(ctx: &Context, command: &ComponentInteraction) {
                             command,
                             &ctx.http,
                             format!("Song **paused!** Use **/resume** to continue playback"),
-                            true,
+                            false,
                         )
                         .await;
                     }
@@ -167,7 +167,7 @@ pub async fn handle_button(ctx: &Context, command: &ComponentInteraction) {
                     command,
                     &ctx.http,
                     format!("The song is currently paused!"),
-                    true,
+                    false,
                 )
                 .await;
             }

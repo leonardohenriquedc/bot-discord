@@ -50,7 +50,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
             PlayMode::Pause => match current_song {
                 Some(song) => match song.play() {
                     Ok(_) => {
-                        respond_to_command(command, &ctx.http, format!("Song **resumed!**"), true)
+                        respond_to_command(command, &ctx.http, format!("Song **resumed!**"), false)
                             .await;
                     }
                     Err(why) => {
@@ -74,7 +74,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
                     command,
                     &ctx.http,
                     format!("The song is currently playing!"),
-                    true,
+                    false,
                 )
                 .await;
             }
@@ -132,7 +132,7 @@ pub async fn handle_button(ctx: &Context, command: &ComponentInteraction) {
             PlayMode::Pause => match current_song {
                 Some(song) => match song.play() {
                     Ok(_) => {
-                        respond_to_button(command, &ctx.http, format!("Song **resumed!**"), true)
+                        respond_to_button(command, &ctx.http, format!("Song **resumed!**"), false)
                             .await;
                     }
                     Err(why) => {
@@ -161,7 +161,7 @@ pub async fn handle_button(ctx: &Context, command: &ComponentInteraction) {
                     command,
                     &ctx.http,
                     format!("The song is currently playing!"),
-                    true,
+                    false,
                 )
                 .await;
             }

@@ -53,7 +53,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
         if is_looping {
             match current_song.unwrap().disable_loop() {
                 Ok(_) => {
-                    respond_to_command(command, &ctx.http, format!("Disabled **looping!**"), true)
+                    respond_to_command(command, &ctx.http, format!("Disabled **looping!**"), false)
                         .await;
                 }
                 // Error disabling loop, return early
@@ -66,7 +66,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
         } else {
             match current_song.unwrap().enable_loop() {
                 Ok(_) => {
-                    respond_to_command(command, &ctx.http, format!("Enabled **looping!** Use **/loop** again to disable or **/skip** to skip"), true).await;
+                    respond_to_command(command, &ctx.http, format!("Enabled **looping!** Use **/loop** again to disable or **/skip** to skip"), false).await;
                 }
                 // Error enabling loop, return early
                 Err(why) => {
@@ -132,7 +132,7 @@ pub async fn handle_button(ctx: &Context, command: &ComponentInteraction) {
         if is_looping {
             match current_song.unwrap().disable_loop() {
                 Ok(_) => {
-                    respond_to_button(command, &ctx.http, format!("Disabled **looping!**"), true)
+                    respond_to_button(command, &ctx.http, format!("Disabled **looping!**"), false)
                         .await;
                 }
                 // Error disabling loop, return early
@@ -146,7 +146,7 @@ pub async fn handle_button(ctx: &Context, command: &ComponentInteraction) {
         } else {
             match current_song.unwrap().enable_loop() {
                 Ok(_) => {
-                    respond_to_button(command, &ctx.http, format!("Enabled **looping!** Use **/loop** again to disable or **/skip** to skip"), true).await;
+                    respond_to_button(command, &ctx.http, format!("Enabled **looping!** Use **/loop** again to disable or **/skip** to skip"), false).await;
                 }
                 // Error enabling loop, return early
                 Err(why) => {

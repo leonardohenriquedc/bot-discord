@@ -4,9 +4,11 @@ use serenity::{
     client::Context,
     model::colour::Color,
 };
-use songbird::input::{Compose, YoutubeDl};
+use songbird::input::YoutubeDl;
 
-use crate::utils::response::respond_to_followup;
+use crate::utils::{
+    response::respond_to_followup, track_utils::enqueue_track, type_map::get_http_client,
+};
 
 pub async fn run(ctx: &Context, command: &CommandInteraction) {
     command.defer(&ctx.http).await.expect(
@@ -43,7 +45,12 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    play_title(&ctx, &command, title).await;
+    let http_client = get_http_client(ctx).await;
+
+    // Get the audio source for the URL
+    let source = YoutubeDl::new_search(http_client, title);
+
+    enqueue_track(ctx, command, source.into()).await;
 }
 
 pub fn register() -> serenity::builder::CreateCommand {
@@ -57,78 +64,4 @@ pub fn register() -> serenity::builder::CreateCommand {
             )
             .required(true),
         )
-}
-
-async fn play_title(ctx: &Context, command: &CommandInteraction, title: String) {
-    let mut response_embed = CreateEmbed::default();
-
-    let manager = songbird::get(&ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialization.");
-
-    let guild_id = command.guild_id.unwrap();
-
-    // Grab the active Call for the command's guild
-    if let Some(call) = manager.get(guild_id) {
-        let mut handler = call.lock().await;
-
-        let should_enqueue = match handler.queue().current() {
-            Some(_) => true,
-            None => false,
-        };
-
-        // Get the audio source for the URL
-        let source = YoutubeDl::new_search(
-            ctx.data
-                .read()
-                .await
-                .get::<crate::utils::type_map::HttpKey>()
-                .unwrap()
-                .clone(),
-            title,
-        );
-
-        // Play/enqueue song
-        let _track = handler.enqueue_input(source.clone().into());
-
-        let mut input: songbird::input::Input = source.clone().into();
-
-        // Get metadata from the source
-        let metadata = input.aux_metadata().await.unwrap_or_default();
-        let track_title = metadata
-            .title
-            .clone()
-            .unwrap_or_else(|| String::from("Song"));
-        let track_thumbnail = metadata.thumbnail.clone();
-
-        let response_description = format_description(track_title, should_enqueue);
-
-        response_embed = response_embed
-            .description(response_description)
-            .color(Color::DARK_GREEN);
-
-        if !should_enqueue {
-            if let Some(url) = track_thumbnail {
-                response_embed = response_embed.image(url);
-            }
-        }
-
-        respond_to_followup(command, &ctx.http, response_embed, true).await;
-    } else {
-        response_embed = response_embed
-            .description(
-                "Error playing song! Ensure Poor Jimmy is in a voice channel with **/join**",
-            )
-            .color(Color::DARK_RED);
-
-        respond_to_followup(command, &ctx.http, response_embed, false).await;
-    }
-}
-
-fn format_description(source_title: String, should_enqueue: bool) -> String {
-    if should_enqueue {
-        return format!("**Queued** {}!", source_title);
-    } else {
-        return format!("**Playing** {}!", source_title);
-    }
 }
