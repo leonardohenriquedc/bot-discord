@@ -10,26 +10,57 @@ use reqwest::Client as HttpClient;
 use serenity::client::ClientBuilder;
 use serenity::prelude::*;
 use songbird::SerenityInit;
+use tracing::{error, info};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 use utils::type_map::HttpKey;
 
 #[tokio::main]
 async fn main() {
+    // Initialize tracing subscriber with environment filter
+    // Set RUST_LOG env variable to control log level (e.g., RUST_LOG=debug)
+    tracing_subscriber::registry()
+        .with(
+            EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| EnvFilter::new("poor_jimmy=info")),
+        )
+        .with(tracing_subscriber::fmt::layer())
+        .init();
+
+    info!("Starting Poor Jimmy Discord Bot...");
+
     // DISCORD_TOKEN is required. Bot will not work without it.
-    let token = env::var("DISCORD_TOKEN").expect("DISCORD_TOKEN env variable was not set!");
+    let token = match env::var("DISCORD_TOKEN") {
+        Ok(token) => token,
+        Err(_) => {
+            error!("DISCORD_TOKEN environment variable not set!");
+            std::process::exit(1);
+        }
+    };
 
     let intents = GatewayIntents::non_privileged()
         | GatewayIntents::MESSAGE_CONTENT
         | GatewayIntents::DIRECT_MESSAGES
         | GatewayIntents::GUILD_VOICE_STATES;
 
-    let mut client = ClientBuilder::new(token, intents)
+    info!("Building Discord client with required intents...");
+
+    let mut client = match ClientBuilder::new(token, intents)
         .event_handler(BotEventHandler)
         .register_songbird()
         .type_map_insert::<HttpKey>(HttpClient::new())
         .await
-        .expect("Error creating client");
+    {
+        Ok(client) => client,
+        Err(err) => {
+            error!("Failed to create Discord client: {}", err);
+            std::process::exit(1);
+        }
+    };
+
+    info!("Starting Discord client connection...");
 
     if let Err(why) = client.start().await {
-        println!("Client error: {why}")
+        error!("Client error: {}", why);
+        std::process::exit(1);
     }
 }

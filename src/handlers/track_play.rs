@@ -7,6 +7,7 @@ use serenity::{
     model::{colour::Color, prelude::ChannelId},
 };
 use songbird::{Event, EventContext, EventHandler};
+use tracing::{error, info};
 
 use crate::components::music_buttons::create_music_buttons;
 
@@ -25,6 +26,8 @@ impl EventHandler for TrackPlayHandler {
             return None;
         };
 
+        info!("Now playing: '{}' in channel {}", self.title, self.channel_id);
+
         let embed = CreateEmbed::new()
             .description(format!("**Now playing:** {}", self.title.clone()))
             .image(self.thumbnail.clone())
@@ -34,7 +37,9 @@ impl EventHandler for TrackPlayHandler {
             .embed(embed)
             .components(create_music_buttons());
 
-        let _ = self.channel_id.send_message(&self.http, message).await;
+        if let Err(err) = self.channel_id.send_message(&self.http, message).await {
+            error!("Failed to send now playing message to channel {}: {}", self.channel_id, err);
+        }
 
         None
     }

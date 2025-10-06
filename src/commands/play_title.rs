@@ -5,15 +5,17 @@ use serenity::{
     model::colour::Color,
 };
 use songbird::input::YoutubeDl;
+use tracing::error;
 
 use crate::utils::{
     response::respond_to_followup, track_utils::enqueue_track, type_map::get_http_client,
 };
 
 pub async fn run(ctx: &Context, command: &CommandInteraction) {
-    command.defer(&ctx.http).await.expect(
-        "Deferring a command response shouldn't fail. Possible change in API requirements/response",
-    );
+    if let Err(err) = command.defer(&ctx.http).await {
+        error!("Failed to defer play-title command: {}", err);
+        return;
+    }
 
     let mut response_embed = CreateEmbed::default();
 

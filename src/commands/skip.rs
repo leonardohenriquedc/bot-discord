@@ -2,6 +2,7 @@ use serenity::{
     all::{CommandInteraction, ComponentInteraction},
     client::Context,
 };
+use tracing::{error, warn};
 
 use crate::utils::response::{
     respond_to_button, respond_to_command, respond_to_error, respond_to_error_button,
@@ -40,12 +41,13 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
                 respond_to_command(command, &ctx.http, format!("Song **skipped!**"), false).await;
             }
             Err(why) => {
-                println!("Error skipping track: {why}");
+                error!("Error skipping track in guild {}: {}", guild_id, why);
 
                 respond_to_error(command, &ctx.http, format!("Error skipping song!")).await;
             }
         };
     } else {
+        warn!("Attempted to skip song but bot is not in voice channel (guild {})", guild_id);
         respond_to_error(
             command,
             &ctx.http,
@@ -88,12 +90,13 @@ pub async fn handle_button(ctx: &Context, command: &ComponentInteraction) {
                 respond_to_button(command, &ctx.http, format!("Song **skipped!**"), false).await;
             }
             Err(why) => {
-                println!("Error skipping track: {why}");
+                error!("Error skipping track via button in guild {}: {}", guild_id, why);
 
                 respond_to_error_button(command, &ctx.http, format!("Error skipping song!")).await;
             }
         };
     } else {
+        warn!("Attempted to skip song via button but bot is not in voice channel (guild {})", guild_id);
         respond_to_error_button(
             command,
             &ctx.http,

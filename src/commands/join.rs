@@ -1,5 +1,6 @@
 use serenity::{all::CommandInteraction, client::Context};
 use songbird::{Event, TrackEvent};
+use tracing::{error, info, warn};
 
 use crate::handlers::track_end::TrackEndNotifier;
 use crate::utils::response::{respond_to_command, respond_to_error};
@@ -22,7 +23,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
 
     // Check if we successfully got the guild from cache
     if voice_channel_id.is_none() && ctx.cache.guild(guild_id).is_none() {
-        println!("Error finding guild in cache: {:?}", ctx.cache);
+        error!("Failed to find guild {} in cache", guild_id);
         respond_to_error(command, &ctx.http, format!("Error joining voice channel")).await;
         return;
     }
@@ -30,6 +31,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
     let connect_to = match voice_channel_id {
         Some(channel) => channel,
         None => {
+            warn!("User {} attempted to use /join but is not in a voice channel (guild {})", user_id, guild_id);
             respond_to_error(
                 command,
                 &ctx.http,
@@ -44,6 +46,8 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
     let manager = songbird::get(&ctx)
         .await
         .expect("Songbird Voice client placed in at initialisation.");
+
+    info!("Attempting to join voice channel {} in guild {}", connect_to, guild_id);
 
     match manager.join(guild_id, connect_to).await {
         Ok(call) => {
@@ -60,6 +64,8 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
                 },
             );
 
+            info!("Successfully joined voice channel {} in guild {}", connect_to, guild_id);
+
             respond_to_command(
                 command,
                 &ctx.http,
@@ -68,7 +74,8 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
             )
             .await;
         }
-        Err(_) => {
+        Err(err) => {
+            error!("Failed to join voice channel {} in guild {}: {}", connect_to, guild_id, err);
             respond_to_error(command, &ctx.http, format!("Error joining voice channel!")).await;
         }
     }

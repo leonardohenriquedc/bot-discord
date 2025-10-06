@@ -7,6 +7,7 @@ use serenity::{
     model::{colour::Color, prelude::ChannelId},
     prelude::Mutex,
 };
+use tracing::{debug, error};
 
 use songbird::{Call, Event, EventContext, EventHandler as VoiceEventHandler};
 
@@ -28,6 +29,7 @@ impl VoiceEventHandler for TrackEndNotifier {
         let queue = handler.queue().current_queue();
 
         if queue.is_empty() {
+            debug!("Queue ended in channel {}", self.channel_id);
             // No songs left in the queue, notify the channel
             let embed = CreateEmbed::new()
                 .description("Queue has **ended!**")
@@ -35,7 +37,9 @@ impl VoiceEventHandler for TrackEndNotifier {
 
             let message = CreateMessage::new().embed(embed);
 
-            let _ = self.channel_id.send_message(&self.http, message).await;
+            if let Err(err) = self.channel_id.send_message(&self.http, message).await {
+                error!("Failed to send queue end notification to channel {}: {}", self.channel_id, err);
+            }
         }
 
         None

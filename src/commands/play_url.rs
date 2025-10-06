@@ -4,6 +4,7 @@ use serenity::{
     client::Context,
     model::colour::Color,
 };
+use tracing::error;
 
 use songbird::input::YoutubeDl;
 
@@ -12,9 +13,10 @@ use crate::utils::{
 };
 
 pub async fn run(ctx: &Context, command: &CommandInteraction) {
-    command.defer(&ctx.http).await.expect(
-        "Deferring a command response shouldn't fail. Possible change in API requirements/response",
-    );
+    if let Err(err) = command.defer(&ctx.http).await {
+        error!("Failed to defer play-url command: {}", err);
+        return;
+    }
 
     let mut response_embed = CreateEmbed::default();
 

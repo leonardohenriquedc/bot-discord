@@ -1,6 +1,7 @@
 use serenity::all::{Color, CommandInteraction, Context, CreateEmbed};
 use songbird::{input::Input, tracks::Track};
 use std::sync::Arc;
+use tracing::{debug, error, info, warn};
 
 use crate::{handlers::track_play::TrackPlayHandler, utils::response::respond_to_followup};
 
@@ -22,12 +23,22 @@ pub async fn enqueue_track(ctx: &Context, command: &CommandInteraction, mut sour
         let mut handler = call.lock().await;
 
         // Get metadata from the source
-        let metadata = source.aux_metadata().await.unwrap_or_default();
+        debug!("Fetching track metadata for guild {}", guild_id);
+        let metadata = match source.aux_metadata().await {
+            Ok(meta) => meta,
+            Err(err) => {
+                warn!("Failed to fetch track metadata: {}. Using defaults.", err);
+                Default::default()
+            }
+        };
+
         let track_title = metadata
             .title
             .clone()
             .unwrap_or_else(|| String::from("Unknown Track Title"));
         let track_thumbnail = metadata.thumbnail.clone();
+
+        info!("Enqueueing track: '{}' in guild {}", track_title, guild_id);
 
         // Create custom metadata to attach to the track
         let custom_metadata = Arc::new(TrackMetadata {
@@ -58,6 +69,8 @@ pub async fn enqueue_track(ctx: &Context, command: &CommandInteraction, mut sour
 
         respond_to_followup(command, &ctx.http, response_embed, false).await;
     } else {
+        error!("Bot is not in a voice channel in guild {}. Cannot enqueue track.", guild_id);
+
         response_embed = response_embed
             .description(
                 "Error playing song! Ensure Poor Jimmy is in a voice channel with **/join**",

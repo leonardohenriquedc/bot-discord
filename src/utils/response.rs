@@ -7,6 +7,7 @@ use serenity::{
     http::Http,
     model::colour::Color,
 };
+use tracing::error;
 
 use crate::components::music_buttons::create_music_buttons;
 
@@ -32,9 +33,9 @@ pub async fn respond_to_command(
 
     let response = CreateInteractionResponse::Message(message);
 
-    command.create_response(http, response).await.expect(
-        "Sending a command response shouldn't fail. Possible change in API requirements/response",
-    );
+    if let Err(err) = command.create_response(http, response).await {
+        error!("Failed to send command response: {}", err);
+    }
 }
 
 pub async fn respond_to_error(command: &CommandInteraction, http: &Http, content: String) {
@@ -45,9 +46,9 @@ pub async fn respond_to_error(command: &CommandInteraction, http: &Http, content
     let message = CreateInteractionResponseMessage::new().embed(embed);
     let response = CreateInteractionResponse::Message(message);
 
-    command.create_response(http, response).await.expect(
-        "Sending a command response shouldn't fail. Possible change in API requirements/response",
-    );
+    if let Err(err) = command.create_response(http, response).await {
+        error!("Failed to send error response: {}", err);
+    }
 }
 
 pub async fn respond_to_button(
@@ -68,9 +69,9 @@ pub async fn respond_to_button(
 
     let response = CreateInteractionResponse::Message(message);
 
-    command.create_response(http, response).await.expect(
-        "Sending a command response shouldn't fail. Possible change in API requirements/response",
-    );
+    if let Err(err) = command.create_response(http, response).await {
+        error!("Failed to send button response: {}", err);
+    }
 }
 
 pub async fn respond_to_error_button(command: &ComponentInteraction, http: &Http, content: String) {
@@ -81,9 +82,9 @@ pub async fn respond_to_error_button(command: &ComponentInteraction, http: &Http
     let message = CreateInteractionResponseMessage::new().embed(embed);
     let response = CreateInteractionResponse::Message(message);
 
-    command.create_response(http, response).await.expect(
-        "Sending a command response shouldn't fail. Possible change in API requirements/response",
-    );
+    if let Err(err) = command.create_response(http, response).await {
+        error!("Failed to send button error response: {}", err);
+    }
 }
 
 /// Respond to a deferred CommandInteraction with the given
@@ -103,8 +104,7 @@ pub async fn respond_to_followup(
         message = message.components(create_music_buttons());
     }
 
-    command
-        .create_followup(http, message)
-        .await
-        .expect("Sending a command response followup shouldn't fail. Possible change in API requirements/response");
+    if let Err(err) = command.create_followup(http, message).await {
+        error!("Failed to send followup response: {}", err);
+    }
 }
