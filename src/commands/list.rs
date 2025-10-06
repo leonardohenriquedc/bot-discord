@@ -1,6 +1,9 @@
 use serenity::{all::CommandInteraction, client::Context};
 
-use crate::utils::response::{respond_to_command, respond_to_error};
+use crate::utils::{
+    response::{respond_to_command, respond_to_error},
+    track_utils::TrackMetadata,
+};
 
 pub async fn run(ctx: &Context, command: &CommandInteraction) {
     let manager = songbird::get(&ctx)
@@ -27,12 +30,9 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
         }
 
         // Transform the Vec of TrackHandles into a Vec of titles
-        // Note: In Songbird 0.5.0, metadata is not directly accessible from TrackHandle
-        // We would need to store it separately when enqueueing tracks
         let queue_titles: Vec<String> = current_queue
             .iter()
-            .enumerate()
-            .map(|(idx, _track)| format!("Track {}", idx + 1))
+            .map(|track| track.data::<TrackMetadata>().title.clone())
             .collect();
 
         // Build the response description string.
