@@ -1,11 +1,8 @@
-use serenity::{
-    builder::CreateApplicationCommand, client::Context,
-    model::application::interaction::application_command::ApplicationCommandInteraction,
-};
+use serenity::{all::CommandInteraction, client::Context};
 
 use crate::utils::response::{respond_to_command, respond_to_error};
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
+pub async fn run(ctx: &Context, command: &CommandInteraction) {
     let manager = songbird::get(&ctx)
         .await
         .expect("Songbird Voice client placed in at initialization.");
@@ -30,15 +27,12 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
         }
 
         // Transform the Vec of TrackHandles into a Vec of titles
+        // Note: In Songbird 0.5.0, metadata is not directly accessible from TrackHandle
+        // We would need to store it separately when enqueueing tracks
         let queue_titles: Vec<String> = current_queue
             .iter()
-            .map(|track| {
-                track
-                    .metadata()
-                    .title
-                    .clone()
-                    .unwrap_or_else(|| "Mystery song".to_string())
-            })
+            .enumerate()
+            .map(|(idx, _track)| format!("Track {}", idx + 1))
             .collect();
 
         // Build the response description string.
@@ -55,10 +49,8 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
     }
 }
 
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("list")
-        .description("Display the current queue of songs")
+pub fn register() -> serenity::builder::CreateCommand {
+    serenity::builder::CreateCommand::new("list").description("Display the current queue of songs")
 }
 
 fn format_queue_description(list_of_titles: Vec<String>) -> String {

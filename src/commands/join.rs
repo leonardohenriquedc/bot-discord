@@ -1,38 +1,31 @@
-use serenity::{
-    builder::CreateApplicationCommand, client::Context,
-    model::application::interaction::application_command::ApplicationCommandInteraction,
-};
+use serenity::{all::CommandInteraction, client::Context};
 use songbird::{Event, TrackEvent};
 
 use crate::handlers::track_end::TrackEndNotifier;
 use crate::utils::response::{respond_to_command, respond_to_error};
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
+pub async fn run(ctx: &Context, command: &CommandInteraction) {
     let guild_id = command.guild_id.unwrap();
     let user_id = {
         let member = command.member.as_ref().unwrap();
         member.user.id
     };
 
+    // Extract voice channel ID from cache, ensuring guild reference is dropped
     let voice_channel_id = {
-        let guild = match ctx.cache.guild(guild_id) {
-            Some(guild) => guild,
-            None => {
-                println!("Error finding guild in cache: {:?}", ctx.cache);
-
-                respond_to_error(command, &ctx.http, format!("Error joining voice channel")).await;
-
-                return;
-            }
-        };
-
-        let voice_state_channel = guild
-            .voice_states
-            .get(&user_id)
-            .and_then(|voice_state| voice_state.channel_id);
-
-        voice_state_channel
+        ctx.cache.guild(guild_id).and_then(|g| {
+            g.voice_states
+                .get(&user_id)
+                .and_then(|voice_state| voice_state.channel_id)
+        })
     };
+
+    // Check if we successfully got the guild from cache
+    if voice_channel_id.is_none() && ctx.cache.guild(guild_id).is_none() {
+        println!("Error finding guild in cache: {:?}", ctx.cache);
+        respond_to_error(command, &ctx.http, format!("Error joining voice channel")).await;
+        return;
+    }
 
     let connect_to = match voice_channel_id {
         Some(channel) => channel,
@@ -52,36 +45,36 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
         .await
         .expect("Songbird Voice client placed in at initialisation.");
 
-    let (call, success) = manager.join(guild_id, connect_to).await;
+    match manager.join(guild_id, connect_to).await {
+        Ok(call) => {
+            let mut handler = call.lock().await;
 
-    if let Ok(_channel) = success {
-        let mut handler = call.lock().await;
+            handler.remove_all_global_events();
 
-        handler.remove_all_global_events();
+            handler.add_global_event(
+                Event::Track(TrackEvent::End),
+                TrackEndNotifier {
+                    channel_id: command.channel_id,
+                    http: ctx.http.clone(),
+                    call: call.clone(),
+                },
+            );
 
-        handler.add_global_event(
-            Event::Track(TrackEvent::End),
-            TrackEndNotifier {
-                channel_id: command.channel_id,
-                http: ctx.http.clone(),
-                call: call.clone(),
-            },
-        );
-
-        respond_to_command(
-            command,
-            &ctx.http,
-            format!("Poor Jimmy **joined** the voice channel!"),
-            false,
-        )
-        .await;
-    } else {
-        respond_to_error(command, &ctx.http, format!("Error joining voice channel!")).await;
+            respond_to_command(
+                command,
+                &ctx.http,
+                format!("Poor Jimmy **joined** the voice channel!"),
+                false,
+            )
+            .await;
+        }
+        Err(_) => {
+            respond_to_error(command, &ctx.http, format!("Error joining voice channel!")).await;
+        }
     }
 }
 
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("join")
+pub fn register() -> serenity::builder::CreateCommand {
+    serenity::builder::CreateCommand::new("join")
         .description("Summon Poor Jimmy to your voice channel")
 }

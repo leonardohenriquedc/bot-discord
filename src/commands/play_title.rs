@@ -1,19 +1,14 @@
 use serenity::{
-    builder::{CreateApplicationCommand, CreateEmbed},
+    all::{CommandDataOptionValue, CommandInteraction, CommandOptionType},
+    builder::CreateEmbed,
     client::Context,
-    model::{
-        application::interaction::application_command::{
-            ApplicationCommandInteraction, CommandDataOptionValue,
-        },
-        prelude::command::CommandOptionType,
-    },
-    utils::Color,
+    model::colour::Color,
 };
-use songbird::input::Restartable;
+use songbird::input::{Compose, YoutubeDl};
 
 use crate::utils::response::respond_to_followup;
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
+pub async fn run(ctx: &Context, command: &CommandInteraction) {
     command.defer(&ctx.http).await.expect(
         "Deferring a command response shouldn't fail. Possible change in API requirements/response",
     );
@@ -23,12 +18,9 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
     let command_value = command.data.options.first();
 
     let resolved_value = match command_value {
-        Some(data) => data
-            .resolved
-            .as_ref()
-            .expect("Couldn't unwrap resolved slash command data"),
+        Some(data) => &data.value,
         _ => {
-            response_embed
+            response_embed = response_embed
                 .description("Please provide a title to search!")
                 .color(Color::DARK_RED);
 
@@ -41,7 +33,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
     let title = match resolved_value {
         CommandDataOptionValue::String(value) => value.clone(),
         _ => {
-            response_embed
+            response_embed = response_embed
                 .description("Please provide a valid title!")
                 .color(Color::DARK_RED);
 
@@ -54,20 +46,20 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
     play_title(&ctx, &command, title).await;
 }
 
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("play-title")
+pub fn register() -> serenity::builder::CreateCommand {
+    serenity::builder::CreateCommand::new("play-title")
         .description("Play the audio from a Youtube video searching by title")
-        .create_option(|option| {
-            option
-                .name("title")
-                .description("A Youtube video title")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
+        .add_option(
+            serenity::builder::CreateCommandOption::new(
+                CommandOptionType::String,
+                "title",
+                "A Youtube video title",
+            )
+            .required(true),
+        )
 }
 
-async fn play_title(ctx: &Context, command: &ApplicationCommandInteraction, title: String) {
+async fn play_title(ctx: &Context, command: &CommandInteraction, title: String) {
     let mut response_embed = CreateEmbed::default();
 
     let manager = songbird::get(&ctx)
@@ -86,46 +78,44 @@ async fn play_title(ctx: &Context, command: &ApplicationCommandInteraction, titl
         };
 
         // Get the audio source for the URL
-        let source_result = Restartable::ytdl_search(title, true).await;
-
-        let source = match source_result {
-            Ok(source) => source,
-            Err(why) => {
-                println!("Error grabbing Youtube single video source: {why}");
-
-                response_embed
-                    .description("Error playing song!")
-                    .color(Color::DARK_RED);
-
-                respond_to_followup(command, &ctx.http, response_embed, false).await;
-
-                return;
-            }
-        };
+        let source = YoutubeDl::new_search(
+            ctx.data
+                .read()
+                .await
+                .get::<crate::utils::type_map::HttpKey>()
+                .unwrap()
+                .clone(),
+            title,
+        );
 
         // Play/enqueue song
-        let track = handler.enqueue_source(source.into());
-        let track_title = match &track.metadata().title {
-            Some(title) => title.clone(),
-            None => String::from("Song"),
-        };
-        let track_thumbnail = &track.metadata().thumbnail;
+        let _track = handler.enqueue_input(source.clone().into());
+
+        let mut input: songbird::input::Input = source.clone().into();
+
+        // Get metadata from the source
+        let metadata = input.aux_metadata().await.unwrap_or_default();
+        let track_title = metadata
+            .title
+            .clone()
+            .unwrap_or_else(|| String::from("Song"));
+        let track_thumbnail = metadata.thumbnail.clone();
 
         let response_description = format_description(track_title, should_enqueue);
 
-        response_embed
+        response_embed = response_embed
             .description(response_description)
             .color(Color::DARK_GREEN);
 
         if !should_enqueue {
             if let Some(url) = track_thumbnail {
-                response_embed.image(url);
+                response_embed = response_embed.image(url);
             }
         }
 
         respond_to_followup(command, &ctx.http, response_embed, true).await;
     } else {
-        response_embed
+        response_embed = response_embed
             .description(
                 "Error playing song! Ensure Poor Jimmy is in a voice channel with **/join**",
             )

@@ -1,8 +1,8 @@
+use serenity::all::{Command, Interaction, Ready};
 use serenity::async_trait;
 use serenity::client::{Context, EventHandler};
-use serenity::model::application::command::Command;
-use serenity::model::application::interaction::Interaction;
-use serenity::model::gateway::{Activity, Ready};
+use serenity::gateway::ActivityData;
+use serenity::model::user::OnlineStatus;
 
 use crate::commands;
 use crate::utils::response::{respond_to_error, respond_to_error_button};
@@ -14,7 +14,7 @@ pub struct BotEventHandler;
 #[async_trait]
 impl EventHandler for BotEventHandler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::ApplicationCommand(command) = interaction {
+        if let Interaction::Command(command) = interaction {
             let command_name = command.data.name.as_str();
 
             match command_name {
@@ -34,7 +34,7 @@ impl EventHandler for BotEventHandler {
                     respond_to_error(&command, &ctx.http, format!("Unknown command!")).await;
                 }
             };
-        } else if let Interaction::MessageComponent(command) = interaction {
+        } else if let Interaction::Component(command) = interaction {
             let button_id = command.data.custom_id.as_str();
 
             match button_id {
@@ -53,24 +53,25 @@ impl EventHandler for BotEventHandler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
 
-        Command::set_global_application_commands(&ctx.http, |commands| {
-            commands
-                .create_application_command(|c| commands::clear::register(c))
-                .create_application_command(|c| commands::help::register(c))
-                .create_application_command(|c| commands::join::register(c))
-                .create_application_command(|c| commands::leave::register(c))
-                .create_application_command(|c| commands::list::register(c))
-                .create_application_command(|c| commands::r#loop::register(c))
-                .create_application_command(|c| commands::pause::register(c))
-                .create_application_command(|c| commands::ping::register(c))
-                .create_application_command(|c| commands::play_title::register(c))
-                .create_application_command(|c| commands::play_url::register(c))
-                .create_application_command(|c| commands::resume::register(c))
-                .create_application_command(|c| commands::skip::register(c))
-        })
-        .await
-        .expect("Failed to register slash commands!");
+        let commands = vec![
+            commands::clear::register(),
+            commands::help::register(),
+            commands::join::register(),
+            commands::leave::register(),
+            commands::list::register(),
+            commands::r#loop::register(),
+            commands::pause::register(),
+            commands::ping::register(),
+            commands::play_title::register(),
+            commands::play_url::register(),
+            commands::resume::register(),
+            commands::skip::register(),
+        ];
 
-        ctx.set_activity(Activity::listening("/play")).await;
+        Command::set_global_commands(&ctx.http, commands)
+            .await
+            .expect("Failed to register slash commands!");
+
+        ctx.set_presence(Some(ActivityData::listening("/play")), OnlineStatus::Online);
     }
 }

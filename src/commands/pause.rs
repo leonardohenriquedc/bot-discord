@@ -1,10 +1,6 @@
 use serenity::{
-    builder::CreateApplicationCommand,
+    all::{CommandInteraction, ComponentInteraction},
     client::Context,
-    model::{
-        application::interaction::application_command::ApplicationCommandInteraction,
-        prelude::message_component::MessageComponentInteraction,
-    },
 };
 use songbird::tracks::PlayMode;
 
@@ -12,7 +8,7 @@ use crate::utils::response::{
     respond_to_button, respond_to_command, respond_to_error, respond_to_error_button,
 };
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
+pub async fn run(ctx: &Context, command: &CommandInteraction) {
     let manager = songbird::get(&ctx)
         .await
         .expect("Songbird Voice client placed in at initialization.");
@@ -98,7 +94,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
     }
 }
 
-pub async fn handle_button(ctx: &Context, command: &MessageComponentInteraction) {
+pub async fn handle_button(ctx: &Context, command: &ComponentInteraction) {
     let manager = songbird::get(&ctx)
         .await
         .expect("Songbird Voice client placed in at initialization.");
@@ -186,8 +182,6 @@ pub async fn handle_button(ctx: &Context, command: &MessageComponentInteraction)
     }
 }
 
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("pause")
-        .description("Pause the currently playing song")
+pub fn register() -> serenity::builder::CreateCommand {
+    serenity::builder::CreateCommand::new("pause").description("Pause the currently playing song")
 }

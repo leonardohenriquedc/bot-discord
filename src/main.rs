@@ -23,8 +23,8 @@ async fn main() {
         | GatewayIntents::GUILD_VOICE_STATES;
 
     let mut client = ClientBuilder::new(token, intents)
-        .register_songbird()
         .event_handler(BotEventHandler)
+        .register_songbird()
         .type_map_insert::<HttpKey>(HttpClient::new())
         .await
         .expect("Error creating client");

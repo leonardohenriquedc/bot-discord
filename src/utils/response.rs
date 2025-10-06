@@ -1,130 +1,110 @@
 use serenity::{
-    builder::CreateEmbed,
-    http::Http,
-    model::{
-        application::interaction::application_command::ApplicationCommandInteraction,
-        prelude::message_component::MessageComponentInteraction,
+    all::{CommandInteraction, ComponentInteraction},
+    builder::{
+        CreateEmbed, CreateInteractionResponse, CreateInteractionResponseFollowup,
+        CreateInteractionResponseMessage,
     },
-    utils::Color,
+    http::Http,
+    model::colour::Color,
 };
 
 use crate::components::music_buttons::create_music_buttons;
 
-/// Respond to an ApplicationCommandInteraction with the given CreateEmbed.
+/// Respond to a CommandInteraction with the given CreateEmbed.
 ///
 /// This assumes the command has not been deferred or responded to yet. If the
 /// command may have been deferred use `respond_to_follow` instead.
 pub async fn respond_to_command(
-    command: &ApplicationCommandInteraction,
+    command: &CommandInteraction,
     http: &Http,
     content: String,
     include_buttons: bool,
 ) {
-    command
-        .create_interaction_response(http, |response| {
-            response.interaction_response_data(|data| {
-                data.set_embed(CreateEmbed::default()
-                    .color(Color::DARK_GREEN)
-                    .description(content)
-                    .to_owned());
+    let embed = CreateEmbed::new()
+        .color(Color::DARK_GREEN)
+        .description(content);
 
-                if include_buttons {
-                    data.set_components(create_music_buttons());
-                }
+    let mut message = CreateInteractionResponseMessage::new().embed(embed);
 
-                data
-            })
-        })
-        .await
-        .expect("Sending a command response followup shouldn't fail. Possible change in API requirements/response");
+    if include_buttons {
+        message = message.components(create_music_buttons());
+    }
+
+    let response = CreateInteractionResponse::Message(message);
+
+    command.create_response(http, response).await.expect(
+        "Sending a command response shouldn't fail. Possible change in API requirements/response",
+    );
 }
 
-pub async fn respond_to_error(
-    command: &ApplicationCommandInteraction,
-    http: &Http,
-    content: String,
-) {
-    command
-        .create_interaction_response(http, |response| {
-            response.interaction_response_data(|data| {
-                data.set_embed(CreateEmbed::default()
-                    .color(Color::DARK_RED)
-                    .description(content)
-                    .to_owned());
+pub async fn respond_to_error(command: &CommandInteraction, http: &Http, content: String) {
+    let embed = CreateEmbed::new()
+        .color(Color::DARK_RED)
+        .description(content);
 
-                data
-            })
-        })
-        .await
-        .expect("Sending a command response followup shouldn't fail. Possible change in API requirements/response");
+    let message = CreateInteractionResponseMessage::new().embed(embed);
+    let response = CreateInteractionResponse::Message(message);
+
+    command.create_response(http, response).await.expect(
+        "Sending a command response shouldn't fail. Possible change in API requirements/response",
+    );
 }
 
 pub async fn respond_to_button(
-    command: &MessageComponentInteraction,
+    command: &ComponentInteraction,
     http: &Http,
     content: String,
     include_buttons: bool,
 ) {
-    command
-        .create_interaction_response(http, |response| {
-            response.interaction_response_data(|data| {
-                data.set_embed(CreateEmbed::default()
-                    .color(Color::DARK_GREEN)
-                    .description(content)
-                    .to_owned());
+    let embed = CreateEmbed::new()
+        .color(Color::DARK_GREEN)
+        .description(content);
 
-                if include_buttons {
-                    data.set_components(create_music_buttons());
-                }
+    let mut message = CreateInteractionResponseMessage::new().embed(embed);
 
-                data
-            })
-        })
-        .await
-        .expect("Sending a command response followup shouldn't fail. Possible change in API requirements/response");
+    if include_buttons {
+        message = message.components(create_music_buttons());
+    }
+
+    let response = CreateInteractionResponse::Message(message);
+
+    command.create_response(http, response).await.expect(
+        "Sending a command response shouldn't fail. Possible change in API requirements/response",
+    );
 }
 
-pub async fn respond_to_error_button(
-    command: &MessageComponentInteraction,
-    http: &Http,
-    content: String,
-) {
-    command
-        .create_interaction_response(http, |response| {
-            response.interaction_response_data(|data| {
-                data.set_embed(CreateEmbed::default()
-                    .color(Color::DARK_RED)
-                    .description(content)
-                    .to_owned());
+pub async fn respond_to_error_button(command: &ComponentInteraction, http: &Http, content: String) {
+    let embed = CreateEmbed::new()
+        .color(Color::DARK_RED)
+        .description(content);
 
-                data
-            })
-        })
-        .await
-        .expect("Sending a command response followup shouldn't fail. Possible change in API requirements/response");
+    let message = CreateInteractionResponseMessage::new().embed(embed);
+    let response = CreateInteractionResponse::Message(message);
+
+    command.create_response(http, response).await.expect(
+        "Sending a command response shouldn't fail. Possible change in API requirements/response",
+    );
 }
 
-/// Respond to a deferred ApplicationCommandInteraction with the given
+/// Respond to a deferred CommandInteraction with the given
 /// CreateEmbed.
 ///
 /// This assumes the command has been deferred. If the command is not deferred
 /// use `respond_to_command` instead.
 pub async fn respond_to_followup(
-    command: &ApplicationCommandInteraction,
+    command: &CommandInteraction,
     http: &Http,
     content: CreateEmbed,
     include_buttons: bool,
 ) {
+    let mut message = CreateInteractionResponseFollowup::new().embed(content);
+
+    if include_buttons {
+        message = message.components(create_music_buttons());
+    }
+
     command
-        .create_followup_message(http, |response| {
-            response.set_embed(content);
-
-            if include_buttons {
-                response.set_components(create_music_buttons());
-            }
-
-            response
-        })
+        .create_followup(http, message)
         .await
         .expect("Sending a command response followup shouldn't fail. Possible change in API requirements/response");
 }

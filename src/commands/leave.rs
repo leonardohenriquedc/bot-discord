@@ -1,11 +1,8 @@
-use serenity::{
-    builder::CreateApplicationCommand, client::Context,
-    model::application::interaction::application_command::ApplicationCommandInteraction,
-};
+use serenity::{all::CommandInteraction, client::Context};
 
 use crate::utils::response::{respond_to_command, respond_to_error};
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
+pub async fn run(ctx: &Context, command: &CommandInteraction) {
     let guild_id = command.guild_id.unwrap();
 
     let manager = songbird::get(&ctx)
@@ -25,8 +22,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
     }
 }
 
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("leave")
+pub fn register() -> serenity::builder::CreateCommand {
+    serenity::builder::CreateCommand::new("leave")
         .description("Remove Poor Jimmy from the voice channel")
 }

@@ -1,11 +1,8 @@
-use serenity::{
-    builder::CreateApplicationCommand, client::Context,
-    model::application::interaction::application_command::ApplicationCommandInteraction,
-};
+use serenity::{all::CommandInteraction, client::Context};
 
 use crate::utils::response::respond_to_command;
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
+pub async fn run(ctx: &Context, command: &CommandInteraction) {
     let help_description = String::from(
         "
     ## 🎶 Poor Jimmy Commands 🎶
@@ -18,7 +15,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
     \n**6. /loop**Enable/disable looping of the current song
     \n**7. /pause**Pause the currently playing song
     \n**8. /ping**Respond with Pong!
-    \n**9. /play-url**Play the audio from a Youtube video or playlist URL
+    \n**9. /play-url**Play the audio from a Youtube video URL
     \n**10. /play-title**Play the audio from a Youtube video best matching the given title
     \n**11. /resume**Resume the currently paused song
     \n**12. /skip**Skip the currently playing song",
@@ -27,8 +24,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
     respond_to_command(command, &ctx.http, help_description, false).await;
 }
 
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("help")
+pub fn register() -> serenity::builder::CreateCommand {
+    serenity::builder::CreateCommand::new("help")
         .description("Display directions on how to use Poor Jimmy's commands")
 }

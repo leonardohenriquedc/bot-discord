@@ -1,6 +1,12 @@
 use std::{sync::Arc, time::Duration};
 
-use serenity::{async_trait, http::Http, model::prelude::ChannelId, prelude::Mutex, utils::Color};
+use serenity::{
+    async_trait,
+    builder::{CreateEmbed, CreateMessage},
+    http::Http,
+    model::{colour::Color, prelude::ChannelId},
+    prelude::Mutex,
+};
 
 use songbird::{Call, Event, EventContext, EventHandler as VoiceEventHandler};
 use tokio::time::sleep;
@@ -36,59 +42,28 @@ impl VoiceEventHandler for TrackEndNotifier {
 
         match next_song {
             // A song was found, notify that it will be playing next
-            Some(song) => {
-                let title = &song.metadata().title;
-                let thumbnail = &song.metadata().thumbnail;
+            // Note: In Songbird 0.5.0, metadata is not directly accessible from TrackHandle
+            // We would need to store it separately when enqueueing tracks
+            Some(_song) => {
+                let embed = CreateEmbed::new()
+                    .description("**Now playing** next track!")
+                    .color(Color::DARK_GREEN);
 
-                match title {
-                    Some(title) => {
-                        let _ = self
-                            .channel_id
-                            .send_message(&self.http, |message| {
-                                message
-                                    .add_embed(|embed| {
-                                        embed
-                                            .description(format!("**Now playing:** {}!", title))
-                                            .color(Color::DARK_GREEN);
+                let message = CreateMessage::new()
+                    .embed(embed)
+                    .components(create_music_buttons());
 
-                                        if let Some(url) = thumbnail {
-                                            embed.image(url);
-                                        }
-
-                                        embed
-                                    })
-                                    .set_components(create_music_buttons())
-                            })
-                            .await;
-                    }
-                    None => {
-                        let _ = self
-                            .channel_id
-                            .send_message(&self.http, |message| {
-                                message
-                                    .add_embed(|embed| {
-                                        embed
-                                            .description("**Now playing:** Mystery song!")
-                                            .color(Color::DARK_GREEN)
-                                    })
-                                    .set_components(create_music_buttons())
-                            })
-                            .await;
-                    }
-                }
+                let _ = self.channel_id.send_message(&self.http, message).await;
             }
             // No song was picked up, the queue is most likely done
             None => {
-                let _ = self
-                    .channel_id
-                    .send_message(&self.http, |message| {
-                        message.add_embed(|embed| {
-                            embed
-                                .description("Queue has **ended!**")
-                                .color(Color::DARK_GREEN)
-                        })
-                    })
-                    .await;
+                let embed = CreateEmbed::new()
+                    .description("Queue has **ended!**")
+                    .color(Color::DARK_GREEN);
+
+                let message = CreateMessage::new().embed(embed);
+
+                let _ = self.channel_id.send_message(&self.http, message).await;
             }
         }
 
