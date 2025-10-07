@@ -38,7 +38,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
         // Build the response description string.
         let response_description = format_queue_description(queue_titles);
 
-        respond_to_command(command, &ctx.http, response_description, true).await;
+        respond_to_command(command, &ctx.http, response_description, false).await;
     } else {
         respond_to_error(
             command,

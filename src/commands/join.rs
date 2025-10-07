@@ -61,6 +61,8 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
                     channel_id: command.channel_id,
                     http: ctx.http.clone(),
                     call: call.clone(),
+                    guild_id,
+                    manager: manager.clone(),
                 },
             );
 

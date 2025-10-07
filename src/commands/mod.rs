@@ -4,6 +4,7 @@ pub mod join;
 pub mod leave;
 pub mod list;
 pub mod r#loop;
+pub mod now_playing;
 pub mod pause;
 pub mod ping;
 pub mod play_title;

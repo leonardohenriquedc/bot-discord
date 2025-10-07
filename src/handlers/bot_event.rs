@@ -18,9 +18,15 @@ impl EventHandler for BotEventHandler {
         if let Interaction::Command(command) = interaction {
             let command_name = command.data.name.as_str();
             let user = &command.user;
-            let guild_id = command.guild_id.map(|g| g.to_string()).unwrap_or_else(|| "DM".to_string());
+            let guild_id = command
+                .guild_id
+                .map(|g| g.to_string())
+                .unwrap_or_else(|| "DM".to_string());
 
-            debug!("Received command '{}' from user {} in guild {}", command_name, user.name, guild_id);
+            debug!(
+                "Received command '{}' from user {} in guild {}",
+                command_name, user.name, guild_id
+            );
 
             match command_name {
                 "clear" => commands::clear::run(&ctx, &command).await,
@@ -29,6 +35,7 @@ impl EventHandler for BotEventHandler {
                 "leave" => commands::leave::run(&ctx, &command).await,
                 "list" => commands::list::run(&ctx, &command).await,
                 "loop" => commands::r#loop::run(&ctx, &command).await,
+                "now-playing" => commands::now_playing::run(&ctx, &command).await,
                 "pause" => commands::pause::run(&ctx, &command).await,
                 "ping" => commands::ping::run(&ctx, &command).await,
                 "play-title" => commands::play_title::run(&ctx, &command).await,
@@ -44,7 +51,10 @@ impl EventHandler for BotEventHandler {
             let button_id = command.data.custom_id.as_str();
             let user = &command.user;
 
-            debug!("Received button interaction '{}' from user {}", button_id, user.name);
+            debug!(
+                "Received button interaction '{}' from user {}",
+                button_id, user.name
+            );
 
             match button_id {
                 "clear" => commands::clear::handle_button(&ctx, &command).await,
@@ -70,6 +80,7 @@ impl EventHandler for BotEventHandler {
             commands::leave::register(),
             commands::list::register(),
             commands::r#loop::register(),
+            commands::now_playing::register(),
             commands::pause::register(),
             commands::ping::register(),
             commands::play_title::register(),
@@ -82,7 +93,10 @@ impl EventHandler for BotEventHandler {
 
         match Command::set_global_commands(&ctx.http, commands).await {
             Ok(registered_commands) => {
-                info!("Successfully registered {} slash commands", registered_commands.len());
+                info!(
+                    "Successfully registered {} slash commands",
+                    registered_commands.len()
+                );
             }
             Err(err) => {
                 error!("Failed to register slash commands: {}", err);
