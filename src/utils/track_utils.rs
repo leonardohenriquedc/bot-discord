@@ -184,3 +184,60 @@ pub async fn enqueue_track_component(
         respond_to_followup_component(interaction, &ctx.http, response_embed, false).await;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_track_metadata_creation() {
+        let metadata = TrackMetadata {
+            title: "Test Song".to_string(),
+            thumbnail_url: Some("https://example.com/thumb.jpg".to_string()),
+            duration: Some(Duration::from_secs(180)),
+        };
+
+        assert_eq!(metadata.title, "Test Song");
+        assert_eq!(
+            metadata.thumbnail_url,
+            Some("https://example.com/thumb.jpg".to_string())
+        );
+        assert_eq!(metadata.duration, Some(Duration::from_secs(180)));
+    }
+
+    #[test]
+    fn test_track_metadata_clone() {
+        let metadata = TrackMetadata {
+            title: "Original".to_string(),
+            thumbnail_url: None,
+            duration: None,
+        };
+
+        let cloned = metadata.clone();
+        assert_eq!(cloned.title, "Original");
+        assert_eq!(cloned.thumbnail_url, None);
+        assert_eq!(cloned.duration, None);
+    }
+
+    #[test]
+    fn test_track_metadata_with_no_thumbnail() {
+        let metadata = TrackMetadata {
+            title: "No Thumbnail Song".to_string(),
+            thumbnail_url: None,
+            duration: Some(Duration::from_secs(240)),
+        };
+
+        assert!(metadata.thumbnail_url.is_none());
+    }
+
+    #[test]
+    fn test_track_metadata_with_no_duration() {
+        let metadata = TrackMetadata {
+            title: "Live Stream".to_string(),
+            thumbnail_url: Some("https://example.com/live.jpg".to_string()),
+            duration: None,
+        };
+
+        assert!(metadata.duration.is_none());
+    }
+}

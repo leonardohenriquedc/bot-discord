@@ -105,4 +105,28 @@ mod tests {
         assert_eq!(false, is_valid_youtube_url(&invalid_url));
         assert_eq!(false, is_valid_youtube_url(&another_invalid_url));
     }
+
+    #[test]
+    fn it_validates_youtube_url_edge_cases() {
+        // Empty string
+        assert_eq!(false, is_valid_youtube_url(&String::from("")));
+
+        // Non-YouTube URLs
+        assert_eq!(false, is_valid_youtube_url(&String::from("https://vimeo.com/12345")));
+        assert_eq!(false, is_valid_youtube_url(&String::from("https://www.google.com")));
+
+        // YouTube URLs without watch or youtu.be
+        assert_eq!(false, is_valid_youtube_url(&String::from("https://www.youtube.com/")));
+        assert_eq!(false, is_valid_youtube_url(&String::from("https://www.youtube.com/channel/test")));
+
+        // Valid variations
+        assert_eq!(true, is_valid_youtube_url(&String::from("https://youtube.com/watch?v=abc123")));
+        assert_eq!(true, is_valid_youtube_url(&String::from("http://www.youtube.com/watch?v=test")));
+    }
+
+    #[test]
+    fn it_validates_youtube_mobile_urls() {
+        let mobile_url = String::from("https://m.youtube.com/watch?v=12345");
+        assert_eq!(true, is_valid_youtube_url(&mobile_url));
+    }
 }

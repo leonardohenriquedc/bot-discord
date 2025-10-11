@@ -34,3 +34,24 @@ pub fn create_music_buttons() -> Vec<CreateActionRow> {
 
     vec![row]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_music_buttons_returns_single_row() {
+        let buttons = create_music_buttons();
+        assert_eq!(buttons.len(), 1);
+    }
+
+    #[test]
+    fn test_music_buttons_has_correct_count() {
+        let buttons = create_music_buttons();
+        if let CreateActionRow::Buttons(ref button_vec) = buttons[0] {
+            assert_eq!(button_vec.len(), 5, "Should have 5 buttons: clear, resume, pause, skip, loop");
+        } else {
+            panic!("Expected CreateActionRow::Buttons variant");
+        }
+    }
+}

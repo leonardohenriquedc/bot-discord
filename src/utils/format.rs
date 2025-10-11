@@ -96,4 +96,53 @@ mod tests {
         assert!(bar.contains("▓▓▓▓▓▓▓▓▓▓"));
         assert!(bar.contains("05:00 / 05:00"));
     }
+
+    #[test]
+    fn test_format_duration_zero() {
+        let duration = Duration::from_secs(0);
+        assert_eq!(format_duration(duration), "00:00");
+    }
+
+    #[test]
+    fn test_format_duration_max_values() {
+        let duration = Duration::from_secs(359999); // 99:59:59
+        assert_eq!(format_duration(duration), "99:59:59");
+    }
+
+    #[test]
+    fn test_progress_bar_no_total() {
+        let current = Duration::from_secs(150);
+        let bar = create_progress_bar(current, None, 10);
+        assert!(bar.contains("02:30 / 02:30"));
+    }
+
+    #[test]
+    fn test_progress_bar_over_100_percent() {
+        // Test that progress is clamped at 100% when current exceeds total
+        let current = Duration::from_secs(400);
+        let total = Duration::from_secs(300);
+        let bar = create_progress_bar(current, Some(total), 10);
+        assert!(bar.contains("▓▓▓▓▓▓▓▓▓▓"));
+        assert!(bar.contains("06:40 / 05:00"));
+    }
+
+    #[test]
+    fn test_progress_bar_different_lengths() {
+        let current = Duration::from_secs(150);
+        let total = Duration::from_secs(300);
+
+        let bar_5 = create_progress_bar(current, Some(total), 5);
+        assert!(bar_5.contains("▓▓░░░") || bar_5.contains("▓▓▓░░"));
+
+        let bar_20 = create_progress_bar(current, Some(total), 20);
+        assert!(bar_20.contains("02:30 / 05:00"));
+    }
+
+    #[test]
+    fn test_progress_bar_zero_length() {
+        let current = Duration::from_secs(0);
+        let total = Duration::from_secs(300);
+        let bar = create_progress_bar(current, Some(total), 0);
+        assert!(bar.contains("[] 00:00 / 05:00"));
+    }
 }

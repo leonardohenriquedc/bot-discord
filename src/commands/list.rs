@@ -68,3 +68,47 @@ fn format_queue_description(list_of_titles: Vec<String>) -> String {
 
     description
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_queue_description_empty() {
+        let titles = vec![];
+        let result = format_queue_description(titles);
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_format_queue_description_single() {
+        let titles = vec!["Song One".to_string()];
+        let result = format_queue_description(titles);
+        assert_eq!(result, "**1:** Song One\n");
+    }
+
+    #[test]
+    fn test_format_queue_description_multiple() {
+        let titles = vec![
+            "First Song".to_string(),
+            "Second Song".to_string(),
+            "Third Song".to_string(),
+        ];
+        let result = format_queue_description(titles);
+        assert_eq!(
+            result,
+            "**1:** First Song\n**2:** Second Song\n**3:** Third Song\n"
+        );
+    }
+
+    #[test]
+    fn test_format_queue_description_with_special_characters() {
+        let titles = vec![
+            "Song with emoji 🎵".to_string(),
+            "Song with **markdown**".to_string(),
+        ];
+        let result = format_queue_description(titles);
+        assert!(result.contains("🎵"));
+        assert!(result.contains("**markdown**"));
+    }
+}
