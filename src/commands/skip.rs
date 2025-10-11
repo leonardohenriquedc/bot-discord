@@ -1,14 +1,19 @@
 use serenity::{
-    all::{CommandInteraction, ComponentInteraction},
+    all::{Color, CommandInteraction, ComponentInteraction, CreateEmbed},
     client::Context,
 };
 use tracing::{error, warn};
 
 use crate::utils::response::{
-    respond_to_button, respond_to_command, respond_to_error, respond_to_error_button,
+    respond_to_button, respond_to_error_button, respond_to_followup,
 };
 
 pub async fn run(ctx: &Context, command: &CommandInteraction) {
+    if let Err(err) = command.defer(&ctx.http).await {
+        error!("Failed to defer skip command: {}", err);
+        return;
+    }
+
     let manager = songbird::get(&ctx)
         .await
         .expect("Songbird Voice client placed in at initialization.");
@@ -22,13 +27,10 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
         let skip_result = match handler.queue().current() {
             Some(track) => track.stop(),
             None => {
-                respond_to_command(
-                    command,
-                    &ctx.http,
-                    format!("There is no song currently playing!"),
-                    false,
-                )
-                .await;
+                let embed = CreateEmbed::new()
+                    .description("There is no song currently playing!")
+                    .color(Color::DARK_RED);
+                respond_to_followup(command, &ctx.http, embed, false).await;
 
                 return;
             }
@@ -38,22 +40,26 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
             // The song was successfully skipped. Notify the channel if the
             // queue is now empty
             Ok(_) => {
-                respond_to_command(command, &ctx.http, format!("Song **skipped!**"), false).await;
+                let embed = CreateEmbed::new()
+                    .description("Song **skipped!**")
+                    .color(Color::DARK_GREEN);
+                respond_to_followup(command, &ctx.http, embed, false).await;
             }
             Err(why) => {
                 error!("Error skipping track in guild {}: {}", guild_id, why);
 
-                respond_to_error(command, &ctx.http, format!("Error skipping song!")).await;
+                let embed = CreateEmbed::new()
+                    .description("Error skipping song!")
+                    .color(Color::DARK_RED);
+                respond_to_followup(command, &ctx.http, embed, false).await;
             }
         };
     } else {
         warn!("Attempted to skip song but bot is not in voice channel (guild {})", guild_id);
-        respond_to_error(
-            command,
-            &ctx.http,
-            format!("Error skipping song! Ensure Poor Jimmy is in a voice channel with **/join**"),
-        )
-        .await;
+        let embed = CreateEmbed::new()
+            .description("Error skipping song! Ensure Poor Jimmy is in a voice channel with **/join**")
+            .color(Color::DARK_RED);
+        respond_to_followup(command, &ctx.http, embed, false).await;
     }
 }
 

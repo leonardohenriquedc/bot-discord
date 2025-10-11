@@ -1,14 +1,18 @@
 use serenity::{
-    all::{CommandInteraction, ComponentInteraction},
+    all::{Color, CommandInteraction, ComponentInteraction, CreateEmbed},
     client::Context,
 };
 use songbird::tracks::PlayMode;
+use tracing::error;
 
-use crate::utils::response::{
-    respond_to_button, respond_to_command, respond_to_error, respond_to_error_button,
-};
+use crate::utils::response::{respond_to_button, respond_to_error_button, respond_to_followup};
 
 pub async fn run(ctx: &Context, command: &CommandInteraction) {
+    if let Err(err) = command.defer(&ctx.http).await {
+        error!("Failed to defer resume command: {}", err);
+        return;
+    }
+
     let manager = songbird::get(&ctx)
         .await
         .expect("Songbird Voice client placed in at initialization.");
@@ -27,19 +31,19 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
                 Err(why) => {
                     println!("Error getting song state: {why}");
 
-                    respond_to_error(command, &ctx.http, format!("Error resuming song!")).await;
+                    let embed = CreateEmbed::new()
+                        .description("Error resuming song!")
+                        .color(Color::DARK_RED);
+                    respond_to_followup(command, &ctx.http, embed, false).await;
 
                     return;
                 }
             },
             None => {
-                respond_to_command(
-                    command,
-                    &ctx.http,
-                    format!("There is no song to resume!"),
-                    false,
-                )
-                .await;
+                let embed = CreateEmbed::new()
+                    .description("There is no song to resume!")
+                    .color(Color::DARK_GREEN);
+                respond_to_followup(command, &ctx.http, embed, false).await;
 
                 return;
             }
@@ -50,42 +54,41 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
             PlayMode::Pause => match current_song {
                 Some(song) => match song.play() {
                     Ok(_) => {
-                        respond_to_command(command, &ctx.http, format!("Song **resumed!**"), false)
-                            .await;
+                        let embed = CreateEmbed::new()
+                            .description("Song **resumed!**")
+                            .color(Color::DARK_GREEN);
+                        respond_to_followup(command, &ctx.http, embed, false).await;
                     }
                     Err(why) => {
                         println!("Error resuming song: {why}");
 
-                        respond_to_error(command, &ctx.http, format!("Error resuming song!")).await;
+                        let embed = CreateEmbed::new()
+                            .description("Error resuming song!")
+                            .color(Color::DARK_RED);
+                        respond_to_followup(command, &ctx.http, embed, false).await;
                     }
                 },
                 None => {
-                    respond_to_command(
-                        command,
-                        &ctx.http,
-                        format!("There is nothing to resume!"),
-                        false,
-                    )
-                    .await;
+                    let embed = CreateEmbed::new()
+                        .description("There is nothing to resume!")
+                        .color(Color::DARK_GREEN);
+                    respond_to_followup(command, &ctx.http, embed, false).await;
                 }
             },
             _ => {
-                respond_to_command(
-                    command,
-                    &ctx.http,
-                    format!("The song is currently playing!"),
-                    false,
-                )
-                .await;
+                let embed = CreateEmbed::new()
+                    .description("The song is currently playing!")
+                    .color(Color::DARK_GREEN);
+                respond_to_followup(command, &ctx.http, embed, false).await;
             }
         };
     } else {
-        respond_to_error(
-            command,
-            &ctx.http,
-            format!("Error resuming song! Ensure Poor Jimmy is in a voice channel with **/join**"),
-        )
-        .await;
+        let embed = CreateEmbed::new()
+            .description(
+                "Error resuming song! Ensure Poor Jimmy is in a voice channel with **/join**",
+            )
+            .color(Color::DARK_RED);
+        respond_to_followup(command, &ctx.http, embed, false).await;
     }
 }
 

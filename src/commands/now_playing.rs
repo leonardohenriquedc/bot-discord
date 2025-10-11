@@ -5,14 +5,12 @@ use serenity::{
 use tracing::{error, warn};
 
 use crate::utils::{
-    format::create_progress_bar,
-    response::{respond_to_command, respond_to_error, respond_to_followup},
-    track_utils::TrackMetadata,
+    format::create_progress_bar, response::respond_to_followup, track_utils::TrackMetadata,
 };
 
 pub async fn run(ctx: &Context, command: &CommandInteraction) {
     if let Err(err) = command.defer(&ctx.http).await {
-        error!("Failed to defer play-title command: {}", err);
+        error!("Failed to defer now playing command: {}", err);
         return;
     }
 
@@ -29,13 +27,10 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
             Some(track) => track,
             None => {
                 warn!("No track currently playing in guild {}", guild_id);
-                respond_to_command(
-                    command,
-                    &ctx.http,
-                    format!("No song is currently playing!"),
-                    false,
-                )
-                .await;
+                let embed = CreateEmbed::new()
+                    .description("No song is currently playing!")
+                    .color(Color::DARK_GREEN);
+                respond_to_followup(command, &ctx.http, embed, false).await;
                 return;
             }
         };
@@ -49,12 +44,10 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
             Ok(info) => info,
             Err(err) => {
                 error!("Failed to get track info in guild {}: {}", guild_id, err);
-                respond_to_error(
-                    command,
-                    &ctx.http,
-                    format!("Error getting track information!"),
-                )
-                .await;
+                let embed = CreateEmbed::new()
+                    .description("Error getting track information!")
+                    .color(Color::DARK_RED);
+                respond_to_followup(command, &ctx.http, embed, false).await;
                 return;
             }
         };
@@ -76,12 +69,10 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
             "Attempted to get now playing but bot is not in voice channel (guild {})",
             guild_id
         );
-        respond_to_error(
-            command,
-            &ctx.http,
-            format!("Error! Ensure Poor Jimmy is in a voice channel with **/join**"),
-        )
-        .await;
+        let embed = CreateEmbed::new()
+            .description("Error! Ensure Poor Jimmy is in a voice channel with **/join**")
+            .color(Color::DARK_RED);
+        respond_to_followup(command, &ctx.http, embed, false).await;
     }
 }
 
