@@ -10,7 +10,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
         .await
         .expect("Songbird Voice client placed in at initialisation.");
 
-    match manager.leave(guild_id).await {
+    match manager.remove(guild_id).await {
         Ok(_) => {
             info!("Successfully left voice channel in guild {}", guild_id);
             respond_to_command(
@@ -22,7 +22,10 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
             .await;
         }
         Err(err) => {
-            error!("Failed to leave voice channel in guild {}: {}", guild_id, err);
+            error!(
+                "Failed to leave voice channel in guild {}: {}",
+                guild_id, err
+            );
             respond_to_error(command, &ctx.http, format!("Error leaving voice channel! Ensure Poor Jimmy is in a voice channel with **/join**")).await;
         }
     }

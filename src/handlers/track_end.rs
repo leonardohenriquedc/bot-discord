@@ -76,7 +76,7 @@ impl VoiceEventHandler for TrackEndNotifier {
                         guild_id
                     );
 
-                    if let Err(err) = manager_clone.leave(guild_id).await {
+                    if let Err(err) = manager_clone.remove(guild_id).await {
                         error!("Failed to auto-disconnect from guild {}: {}", guild_id, err);
                     } else {
                         // Send disconnect notification
