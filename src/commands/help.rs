@@ -1,34 +1,67 @@
 use serenity::{
-    builder::CreateApplicationCommand, client::Context,
-    model::application::interaction::application_command::ApplicationCommandInteraction,
+    all::{Color, CommandInteraction, CreateEmbed},
+    client::Context,
 };
+use tracing::error;
 
-use crate::utils::response::respond_to_command;
+use crate::utils::response::respond_to_followup;
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
-    let help_description = String::from(
-        "
-    ## 🎶 Poor Jimmy Commands 🎶
-    \nUse these commands to control the music playback in your server. Enjoy the tunes! 🎵
-    \n**1. /clear**Stop the current song and clear the queue
-    \n**2. /help**Displays this help message, providing information on available commands
-    \n**3. /join**Summon Poor Jimmy to your voice channel
-    \n**4. /leave**Remove Poor Jimmy from the voice channel
-    \n**5. /list**Display the current queue of songs
-    \n**6. /loop**Enable/disable looping of the current song
-    \n**7. /pause**Pause the currently playing song
-    \n**8. /ping**Respond with Pong!
-    \n**9. /play-url**Play the audio from a Youtube video or playlist URL
-    \n**10. /play-title**Play the audio from a Youtube video best matching the given title
-    \n**11. /resume**Resume the currently paused song
-    \n**12. /skip**Skip the currently playing song",
-    );
+pub async fn run(ctx: &Context, command: &CommandInteraction) {
+    if let Err(err) = command.defer(&ctx.http).await {
+        error!("Failed to defer help command: {}", err);
+        return;
+    }
 
-    respond_to_command(command, &ctx.http, help_description, false).await;
+    let embed = CreateEmbed::new()
+        .description(get_help_text())
+        .color(Color::DARK_GREEN);
+
+    respond_to_followup(command, &ctx.http, embed, false).await;
 }
 
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("help")
+pub fn register() -> serenity::builder::CreateCommand {
+    serenity::builder::CreateCommand::new("help")
         .description("Display directions on how to use Poor Jimmy's commands")
+}
+
+/// Get the help description text
+pub fn get_help_text() -> String {
+    String::from(
+        "## 🎶 Poor Jimmy - Discord Music Bot 🎶
+
+**Getting Started**
+First, join a voice channel, then use `/join` to bring Poor Jimmy into your channel.
+
+**Playing Music**
+• `/play-title <title>` - Search and play a song by title
+  Example: `/play-title never gonna give you up`
+
+• `/play-url <url>` - Play a specific YouTube video or share link
+  Example: `/play-url https://youtube.com/watch?v=...`
+
+• `/search <query>` - Search YouTube and select from results
+  Example: `/search lofi hip hop`
+
+**Playback Controls**
+• `/pause` - Pause the current song
+• `/resume` - Resume playback
+• `/skip` - Skip to the next song in queue
+• `/loop` - Toggle looping for the current song
+• `/now-playing` - Show current song with progress bar
+
+**Queue Management**
+• `/list` - View all songs in the queue
+• `/clear` - Stop playback and clear the entire queue
+
+**Other Commands**
+• `/join` - Summon Poor Jimmy to your voice channel
+• `/leave` - Remove Poor Jimmy from the voice channel
+• `/ping` - Check if the bot is responsive
+• `/help` - Display this help message
+
+**Tips**
+- Use the interactive buttons that appear with songs for quick controls
+- Queue up multiple songs - they'll play automatically
+- Poor Jimmy must be in a voice channel to play music",
+    )
 }

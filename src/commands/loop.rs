@@ -1,18 +1,18 @@
 use serenity::{
-    builder::CreateApplicationCommand,
+    all::{Color, CommandInteraction, ComponentInteraction, CreateEmbed},
     client::Context,
-    model::{
-        application::interaction::application_command::ApplicationCommandInteraction,
-        prelude::message_component::MessageComponentInteraction,
-    },
 };
 use songbird::tracks::LoopState;
+use tracing::error;
 
-use crate::utils::response::{
-    respond_to_button, respond_to_command, respond_to_error, respond_to_error_button,
-};
+use crate::utils::response::{respond_to_button, respond_to_error_button, respond_to_followup};
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
+pub async fn run(ctx: &Context, command: &CommandInteraction) {
+    if let Err(err) = command.defer(&ctx.http).await {
+        error!("Failed to defer loop command: {}", err);
+        return;
+    }
+
     let manager = songbird::get(&ctx)
         .await
         .expect("Songbird Voice client placed in at initialization.");
@@ -34,7 +34,10 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
                     Err(why) => {
                         println!("Error getting song state: {why}");
 
-                        respond_to_error(command, &ctx.http, format!("Error looping song!")).await;
+                        let embed = CreateEmbed::new()
+                            .description("Error looping song!")
+                            .color(Color::DARK_RED);
+                        respond_to_followup(command, &ctx.http, embed, false).await;
 
                         return;
                     }
@@ -42,13 +45,10 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
             }
             // If the queue is empty, return early
             None => {
-                respond_to_command(
-                    command,
-                    &ctx.http,
-                    format!("There is no song to loop!"),
-                    false,
-                )
-                .await;
+                let embed = CreateEmbed::new()
+                    .description("There is no song to loop!")
+                    .color(Color::DARK_GREEN);
+                respond_to_followup(command, &ctx.http, embed, false).await;
 
                 return;
             }
@@ -57,40 +57,51 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
         if is_looping {
             match current_song.unwrap().disable_loop() {
                 Ok(_) => {
-                    respond_to_command(command, &ctx.http, format!("Disabled **looping!**"), true)
-                        .await;
+                    let embed = CreateEmbed::new()
+                        .description("Disabled **looping!**")
+                        .color(Color::DARK_GREEN);
+                    respond_to_followup(command, &ctx.http, embed, false).await;
                 }
                 // Error disabling loop, return early
                 Err(why) => {
                     println!("Error disabling looping: {why}");
 
-                    respond_to_error(command, &ctx.http, format!("Error looping song!")).await;
+                    let embed = CreateEmbed::new()
+                        .description("Error looping song!")
+                        .color(Color::DARK_RED);
+                    respond_to_followup(command, &ctx.http, embed, false).await;
                 }
             }
         } else {
             match current_song.unwrap().enable_loop() {
                 Ok(_) => {
-                    respond_to_command(command, &ctx.http, format!("Enabled **looping!** Use **/loop** again to disable or **/skip** to skip"), true).await;
+                    let embed = CreateEmbed::new()
+                        .description("Enabled **looping!** Use **/loop** again to disable or **/skip** to skip")
+                        .color(Color::DARK_GREEN);
+                    respond_to_followup(command, &ctx.http, embed, false).await;
                 }
                 // Error enabling loop, return early
                 Err(why) => {
                     println!("Error looping song: {why}");
 
-                    respond_to_error(command, &ctx.http, format!("Error looping song!")).await;
+                    let embed = CreateEmbed::new()
+                        .description("Error looping song!")
+                        .color(Color::DARK_RED);
+                    respond_to_followup(command, &ctx.http, embed, false).await;
                 }
             }
         }
     } else {
-        respond_to_error(
-            command,
-            &ctx.http,
-            format!("Error looping song! Ensure Poor Jimmy is in a voice channel with **/join**"),
-        )
-        .await;
+        let embed = CreateEmbed::new()
+            .description(
+                "Error looping song! Ensure Poor Jimmy is in a voice channel with **/join**",
+            )
+            .color(Color::DARK_RED);
+        respond_to_followup(command, &ctx.http, embed, false).await;
     }
 }
 
-pub async fn handle_button(ctx: &Context, command: &MessageComponentInteraction) {
+pub async fn handle_button(ctx: &Context, command: &ComponentInteraction) {
     let manager = songbird::get(&ctx)
         .await
         .expect("Songbird Voice client placed in at initialization.");
@@ -136,7 +147,7 @@ pub async fn handle_button(ctx: &Context, command: &MessageComponentInteraction)
         if is_looping {
             match current_song.unwrap().disable_loop() {
                 Ok(_) => {
-                    respond_to_button(command, &ctx.http, format!("Disabled **looping!**"), true)
+                    respond_to_button(command, &ctx.http, format!("Disabled **looping!**"), false)
                         .await;
                 }
                 // Error disabling loop, return early
@@ -150,7 +161,7 @@ pub async fn handle_button(ctx: &Context, command: &MessageComponentInteraction)
         } else {
             match current_song.unwrap().enable_loop() {
                 Ok(_) => {
-                    respond_to_button(command, &ctx.http, format!("Enabled **looping!** Use **/loop** again to disable or **/skip** to skip"), true).await;
+                    respond_to_button(command, &ctx.http, format!("Enabled **looping!** Use **/loop** again to disable or **/skip** to skip"), false).await;
                 }
                 // Error enabling loop, return early
                 Err(why) => {
@@ -171,8 +182,7 @@ pub async fn handle_button(ctx: &Context, command: &MessageComponentInteraction)
     }
 }
 
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("loop")
+pub fn register() -> serenity::builder::CreateCommand {
+    serenity::builder::CreateCommand::new("loop")
         .description("Enable/disable looping for the current song")
 }

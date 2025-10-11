@@ -1,8 +1,9 @@
+use serenity::all::{Command, Interaction, Ready};
 use serenity::async_trait;
 use serenity::client::{Context, EventHandler};
-use serenity::model::application::command::Command;
-use serenity::model::application::interaction::Interaction;
-use serenity::model::gateway::{Activity, Ready};
+use serenity::gateway::ActivityData;
+use serenity::model::user::OnlineStatus;
+use tracing::{debug, error, info};
 
 use crate::commands;
 use crate::utils::response::{respond_to_error, respond_to_error_button};
@@ -14,8 +15,18 @@ pub struct BotEventHandler;
 #[async_trait]
 impl EventHandler for BotEventHandler {
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::ApplicationCommand(command) = interaction {
+        if let Interaction::Command(command) = interaction {
             let command_name = command.data.name.as_str();
+            let user = &command.user;
+            let guild_id = command
+                .guild_id
+                .map(|g| g.to_string())
+                .unwrap_or_else(|| "DM".to_string());
+
+            debug!(
+                "Received command '{}' from user {} in guild {}",
+                command_name, user.name, guild_id
+            );
 
             match command_name {
                 "clear" => commands::clear::run(&ctx, &command).await,
@@ -24,53 +35,81 @@ impl EventHandler for BotEventHandler {
                 "leave" => commands::leave::run(&ctx, &command).await,
                 "list" => commands::list::run(&ctx, &command).await,
                 "loop" => commands::r#loop::run(&ctx, &command).await,
+                "now-playing" => commands::now_playing::run(&ctx, &command).await,
                 "pause" => commands::pause::run(&ctx, &command).await,
                 "ping" => commands::ping::run(&ctx, &command).await,
                 "play-title" => commands::play_title::run(&ctx, &command).await,
                 "play-url" => commands::play_url::run(&ctx, &command).await,
+                "search" => commands::search::run(&ctx, &command).await,
                 "skip" => commands::skip::run(&ctx, &command).await,
                 "resume" => commands::resume::run(&ctx, &command).await,
                 _ => {
+                    error!("Unknown command received: {}", command_name);
                     respond_to_error(&command, &ctx.http, format!("Unknown command!")).await;
                 }
             };
-        } else if let Interaction::MessageComponent(command) = interaction {
+        } else if let Interaction::Component(command) = interaction {
             let button_id = command.data.custom_id.as_str();
+            let user = &command.user;
 
-            match button_id {
-                "clear" => commands::clear::handle_button(&ctx, &command).await,
-                "loop" => commands::r#loop::handle_button(&ctx, &command).await,
-                "pause" => commands::pause::handle_button(&ctx, &command).await,
-                "resume" => commands::resume::handle_button(&ctx, &command).await,
-                "skip" => commands::skip::handle_button(&ctx, &command).await,
-                _ => {
-                    respond_to_error_button(&command, &ctx.http, format!("Unknown command!")).await;
+            debug!(
+                "Received button interaction '{}' from user {}",
+                button_id, user.name
+            );
+
+            if button_id.starts_with("search_play_") {
+                commands::search::handle_component(&ctx, &command).await;
+            } else {
+                match button_id {
+                    "clear" => commands::clear::handle_button(&ctx, &command).await,
+                    "loop" => commands::r#loop::handle_button(&ctx, &command).await,
+                    "pause" => commands::pause::handle_button(&ctx, &command).await,
+                    "resume" => commands::resume::handle_button(&ctx, &command).await,
+                    "skip" => commands::skip::handle_button(&ctx, &command).await,
+                    _ => {
+                        error!("Unknown button interaction received: {}", button_id);
+                        respond_to_error_button(&command, &ctx.http, format!("Unknown command!")).await;
+                    }
                 }
             }
         }
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
-        println!("{} is connected!", ready.user.name);
+        info!("{} is connected! (ID: {})", ready.user.name, ready.user.id);
 
-        Command::set_global_application_commands(&ctx.http, |commands| {
-            commands
-                .create_application_command(|c| commands::clear::register(c))
-                .create_application_command(|c| commands::help::register(c))
-                .create_application_command(|c| commands::join::register(c))
-                .create_application_command(|c| commands::leave::register(c))
-                .create_application_command(|c| commands::list::register(c))
-                .create_application_command(|c| commands::r#loop::register(c))
-                .create_application_command(|c| commands::pause::register(c))
-                .create_application_command(|c| commands::ping::register(c))
-                .create_application_command(|c| commands::play_title::register(c))
-                .create_application_command(|c| commands::play_url::register(c))
-                .create_application_command(|c| commands::resume::register(c))
-                .create_application_command(|c| commands::skip::register(c))
-        })
-        .await
-        .expect("Failed to register slash commands!");
+        let commands = vec![
+            commands::clear::register(),
+            commands::help::register(),
+            commands::join::register(),
+            commands::leave::register(),
+            commands::list::register(),
+            commands::r#loop::register(),
+            commands::now_playing::register(),
+            commands::pause::register(),
+            commands::ping::register(),
+            commands::play_title::register(),
+            commands::play_url::register(),
+            commands::resume::register(),
+            commands::search::register(),
+            commands::skip::register(),
+        ];
 
-        ctx.set_activity(Activity::listening("/play")).await;
+        info!("Registering {} slash commands globally...", commands.len());
+
+        match Command::set_global_commands(&ctx.http, commands).await {
+            Ok(registered_commands) => {
+                info!(
+                    "Successfully registered {} slash commands",
+                    registered_commands.len()
+                );
+            }
+            Err(err) => {
+                error!("Failed to register slash commands: {}", err);
+            }
+        }
+
+        ctx.set_presence(Some(ActivityData::listening("/play")), OnlineStatus::Online);
+        info!("Bot is ready and listening for commands!");
     }
 }

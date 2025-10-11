@@ -1,35 +1,31 @@
 use serenity::{
-    builder::{CreateApplicationCommand, CreateEmbed},
+    all::{CommandDataOptionValue, CommandInteraction, CommandOptionType},
+    builder::CreateEmbed,
     client::Context,
-    model::{
-        application::interaction::application_command::{
-            ApplicationCommandInteraction, CommandDataOptionValue,
-        },
-        prelude::command::CommandOptionType,
-    },
-    utils::Color,
+    model::colour::Color,
+};
+use tracing::error;
+
+use songbird::input::YoutubeDl;
+
+use crate::utils::{
+    response::respond_to_followup, track_utils::enqueue_track, type_map::get_http_client,
 };
 
-use songbird::input::Restartable;
-
-use crate::utils::response::respond_to_followup;
-
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
-    command.defer(&ctx.http).await.expect(
-        "Deferring a command response shouldn't fail. Possible change in API requirements/response",
-    );
+pub async fn run(ctx: &Context, command: &CommandInteraction) {
+    if let Err(err) = command.defer(&ctx.http).await {
+        error!("Failed to defer play-url command: {}", err);
+        return;
+    }
 
     let mut response_embed = CreateEmbed::default();
 
     let command_value = command.data.options.first();
 
     let resolved_value = match command_value {
-        Some(data) => data
-            .resolved
-            .as_ref()
-            .expect("Couldn't unwrap resolved slash command data"),
+        Some(data) => &data.value,
         _ => {
-            response_embed
+            response_embed = response_embed
                 .description("Please provide a URL to play!")
                 .color(Color::DARK_RED);
 
@@ -42,7 +38,7 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
     let url = match resolved_value {
         CommandDataOptionValue::String(value) => value.clone(),
         _ => {
-            response_embed
+            response_embed = response_embed
                 .description("Please provide a valid URL!")
                 .color(Color::DARK_RED);
 
@@ -52,28 +48,9 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
         }
     };
 
-    play_url(&ctx, &command, url).await;
-}
-
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("play-url")
-        .description("Play the audio from a Youtube video or playlist URL")
-        .create_option(|option| {
-            option
-                .name("url")
-                .description("A Youtube video/playlist URL")
-                .kind(CommandOptionType::String)
-                .required(true)
-        })
-}
-
-async fn play_url(ctx: &Context, command: &ApplicationCommandInteraction, url: String) {
-    let mut response_embed = CreateEmbed::default();
-
     // Validate its a valid Youtube URL
     if !is_valid_youtube_url(&url) {
-        response_embed
+        response_embed = response_embed
             .description("Please provide a valid **/watch** Youtube URL")
             .color(Color::DARK_RED);
 
@@ -82,81 +59,26 @@ async fn play_url(ctx: &Context, command: &ApplicationCommandInteraction, url: S
         return;
     }
 
-    // Grab the voice client registered with Serentiy's shard key-value store
-    let manager = songbird::get(&ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialization.");
+    let http_client = get_http_client(ctx).await;
 
-    let guild_id = command.guild_id.unwrap();
+    // Get the audio source for the URL
+    let source = YoutubeDl::new(http_client, url);
 
-    // Grab the active Call for the command's guild
-    if let Some(call) = manager.get(guild_id) {
-        let mut handler = call.lock().await;
+    enqueue_track(ctx, command, source.into()).await;
+}
 
-        // If a song is currently playing, we'll add the new song to the queue
-        let should_enqueue = match handler.queue().current() {
-            Some(_) => true,
-            None => false,
-        };
-
-        // Get the audio source for the URL
-        let source_result = Restartable::ytdl(url, true).await;
-
-        let source = match source_result {
-            Ok(source) => source,
-            Err(why) => {
-                println!("Error grabbing Youtube single video source: {why}");
-
-                response_embed
-                    .description("Error playing song")
-                    .color(Color::DARK_RED);
-
-                respond_to_followup(command, &ctx.http, response_embed, false).await;
-
-                return;
-            }
-        };
-
-        // Play/enqueue song
-        let track = handler.enqueue_source(source.into());
-        let track_title = match &track.metadata().title {
-            Some(title) => title.clone(),
-            None => String::from("Song"),
-        };
-        let track_thumbnail = &track.metadata().thumbnail;
-
-        let response_description = format_description(track_title, should_enqueue);
-
-        response_embed
-            .description(response_description)
-            .color(Color::DARK_GREEN);
-
-        if !should_enqueue {
-            if let Some(url) = track_thumbnail {
-                response_embed.image(url);
-            }
-        }
-
-        respond_to_followup(command, &ctx.http, response_embed, true).await;
-    } else {
-        response_embed
-            .description(
-                "Error playing song! Ensure Poor Jimmy is in a voice channel with **/join**",
+pub fn register() -> serenity::builder::CreateCommand {
+    serenity::builder::CreateCommand::new("play-url")
+        .description("Play the audio from a Youtube video URL")
+        .add_option(
+            serenity::builder::CreateCommandOption::new(
+                CommandOptionType::String,
+                "url",
+                "A Youtube video URL",
             )
-            .color(Color::DARK_RED);
-
-        respond_to_followup(command, &ctx.http, response_embed, false).await;
-    }
+            .required(true),
+        )
 }
-
-fn format_description(source_title: String, should_enqueue: bool) -> String {
-    if should_enqueue {
-        return format!("**Queued** {}!", source_title);
-    } else {
-        return format!("**Playing** {}!", source_title);
-    }
-}
-
 fn is_valid_youtube_url(url: &String) -> bool {
     (url.contains("youtube.com") && (url.contains("/watch"))) || url.contains("youtu.be")
 }
@@ -164,24 +86,6 @@ fn is_valid_youtube_url(url: &String) -> bool {
 #[cfg(test)]
 mod tests {
     use crate::commands::play_url::is_valid_youtube_url;
-
-    use super::format_description;
-
-    #[test]
-    fn it_formats_description_queued() {
-        let title = String::from("Heat Waves");
-
-        let formatted = format_description(title.clone(), true);
-        assert_eq!(format!("**Queued** {}!", title), formatted);
-    }
-
-    #[test]
-    fn it_formats_description_playing() {
-        let title = String::from("Heat Waves");
-
-        let formatted = format_description(title.clone(), false);
-        assert_eq!(format!("**Playing** {}!", title), formatted);
-    }
 
     #[test]
     fn it_validates_valid_youtube_urls() {
@@ -200,5 +104,29 @@ mod tests {
 
         assert_eq!(false, is_valid_youtube_url(&invalid_url));
         assert_eq!(false, is_valid_youtube_url(&another_invalid_url));
+    }
+
+    #[test]
+    fn it_validates_youtube_url_edge_cases() {
+        // Empty string
+        assert_eq!(false, is_valid_youtube_url(&String::from("")));
+
+        // Non-YouTube URLs
+        assert_eq!(false, is_valid_youtube_url(&String::from("https://vimeo.com/12345")));
+        assert_eq!(false, is_valid_youtube_url(&String::from("https://www.google.com")));
+
+        // YouTube URLs without watch or youtu.be
+        assert_eq!(false, is_valid_youtube_url(&String::from("https://www.youtube.com/")));
+        assert_eq!(false, is_valid_youtube_url(&String::from("https://www.youtube.com/channel/test")));
+
+        // Valid variations
+        assert_eq!(true, is_valid_youtube_url(&String::from("https://youtube.com/watch?v=abc123")));
+        assert_eq!(true, is_valid_youtube_url(&String::from("http://www.youtube.com/watch?v=test")));
+    }
+
+    #[test]
+    fn it_validates_youtube_mobile_urls() {
+        let mobile_url = String::from("https://m.youtube.com/watch?v=12345");
+        assert_eq!(true, is_valid_youtube_url(&mobile_url));
     }
 }

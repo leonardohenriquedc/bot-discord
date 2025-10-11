@@ -1,17 +1,19 @@
 use serenity::{
-    builder::CreateApplicationCommand,
+    all::{Color, CommandInteraction, ComponentInteraction, CreateEmbed},
     client::Context,
-    model::{
-        application::interaction::application_command::ApplicationCommandInteraction,
-        prelude::message_component::MessageComponentInteraction,
-    },
 };
+use tracing::{error, warn};
 
 use crate::utils::response::{
-    respond_to_button, respond_to_command, respond_to_error, respond_to_error_button,
+    respond_to_button, respond_to_error_button, respond_to_followup,
 };
 
-pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
+pub async fn run(ctx: &Context, command: &CommandInteraction) {
+    if let Err(err) = command.defer(&ctx.http).await {
+        error!("Failed to defer skip command: {}", err);
+        return;
+    }
+
     let manager = songbird::get(&ctx)
         .await
         .expect("Songbird Voice client placed in at initialization.");
@@ -25,13 +27,10 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
         let skip_result = match handler.queue().current() {
             Some(track) => track.stop(),
             None => {
-                respond_to_command(
-                    command,
-                    &ctx.http,
-                    format!("There is no song currently playing!"),
-                    false,
-                )
-                .await;
+                let embed = CreateEmbed::new()
+                    .description("There is no song currently playing!")
+                    .color(Color::DARK_RED);
+                respond_to_followup(command, &ctx.http, embed, false).await;
 
                 return;
             }
@@ -41,25 +40,30 @@ pub async fn run(ctx: &Context, command: &ApplicationCommandInteraction) {
             // The song was successfully skipped. Notify the channel if the
             // queue is now empty
             Ok(_) => {
-                respond_to_command(command, &ctx.http, format!("Song **skipped!**"), false).await;
+                let embed = CreateEmbed::new()
+                    .description("Song **skipped!**")
+                    .color(Color::DARK_GREEN);
+                respond_to_followup(command, &ctx.http, embed, false).await;
             }
             Err(why) => {
-                println!("Error skipping track: {why}");
+                error!("Error skipping track in guild {}: {}", guild_id, why);
 
-                respond_to_error(command, &ctx.http, format!("Error skipping song!")).await;
+                let embed = CreateEmbed::new()
+                    .description("Error skipping song!")
+                    .color(Color::DARK_RED);
+                respond_to_followup(command, &ctx.http, embed, false).await;
             }
         };
     } else {
-        respond_to_error(
-            command,
-            &ctx.http,
-            format!("Error skipping song! Ensure Poor Jimmy is in a voice channel with **/join**"),
-        )
-        .await;
+        warn!("Attempted to skip song but bot is not in voice channel (guild {})", guild_id);
+        let embed = CreateEmbed::new()
+            .description("Error skipping song! Ensure Poor Jimmy is in a voice channel with **/join**")
+            .color(Color::DARK_RED);
+        respond_to_followup(command, &ctx.http, embed, false).await;
     }
 }
 
-pub async fn handle_button(ctx: &Context, command: &MessageComponentInteraction) {
+pub async fn handle_button(ctx: &Context, command: &ComponentInteraction) {
     let manager = songbird::get(&ctx)
         .await
         .expect("Songbird Voice client placed in at initialization.");
@@ -92,12 +96,13 @@ pub async fn handle_button(ctx: &Context, command: &MessageComponentInteraction)
                 respond_to_button(command, &ctx.http, format!("Song **skipped!**"), false).await;
             }
             Err(why) => {
-                println!("Error skipping track: {why}");
+                error!("Error skipping track via button in guild {}: {}", guild_id, why);
 
                 respond_to_error_button(command, &ctx.http, format!("Error skipping song!")).await;
             }
         };
     } else {
+        warn!("Attempted to skip song via button but bot is not in voice channel (guild {})", guild_id);
         respond_to_error_button(
             command,
             &ctx.http,
@@ -107,8 +112,6 @@ pub async fn handle_button(ctx: &Context, command: &MessageComponentInteraction)
     }
 }
 
-pub fn register(command: &mut CreateApplicationCommand) -> &mut CreateApplicationCommand {
-    command
-        .name("skip")
-        .description("Skip the currently playing song")
+pub fn register() -> serenity::builder::CreateCommand {
+    serenity::builder::CreateCommand::new("skip").description("Skip the currently playing song")
 }
