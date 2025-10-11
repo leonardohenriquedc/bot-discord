@@ -10,4 +10,5 @@ pub mod ping;
 pub mod play_title;
 pub mod play_url;
 pub mod resume;
+pub mod search;
 pub mod skip;

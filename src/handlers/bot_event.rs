@@ -40,6 +40,7 @@ impl EventHandler for BotEventHandler {
                 "ping" => commands::ping::run(&ctx, &command).await,
                 "play-title" => commands::play_title::run(&ctx, &command).await,
                 "play-url" => commands::play_url::run(&ctx, &command).await,
+                "search" => commands::search::run(&ctx, &command).await,
                 "skip" => commands::skip::run(&ctx, &command).await,
                 "resume" => commands::resume::run(&ctx, &command).await,
                 _ => {
@@ -56,15 +57,19 @@ impl EventHandler for BotEventHandler {
                 button_id, user.name
             );
 
-            match button_id {
-                "clear" => commands::clear::handle_button(&ctx, &command).await,
-                "loop" => commands::r#loop::handle_button(&ctx, &command).await,
-                "pause" => commands::pause::handle_button(&ctx, &command).await,
-                "resume" => commands::resume::handle_button(&ctx, &command).await,
-                "skip" => commands::skip::handle_button(&ctx, &command).await,
-                _ => {
-                    error!("Unknown button interaction received: {}", button_id);
-                    respond_to_error_button(&command, &ctx.http, format!("Unknown command!")).await;
+            if button_id.starts_with("search_play_") {
+                commands::search::handle_component(&ctx, &command).await;
+            } else {
+                match button_id {
+                    "clear" => commands::clear::handle_button(&ctx, &command).await,
+                    "loop" => commands::r#loop::handle_button(&ctx, &command).await,
+                    "pause" => commands::pause::handle_button(&ctx, &command).await,
+                    "resume" => commands::resume::handle_button(&ctx, &command).await,
+                    "skip" => commands::skip::handle_button(&ctx, &command).await,
+                    _ => {
+                        error!("Unknown button interaction received: {}", button_id);
+                        respond_to_error_button(&command, &ctx.http, format!("Unknown command!")).await;
+                    }
                 }
             }
         }
@@ -86,6 +91,7 @@ impl EventHandler for BotEventHandler {
             commands::play_title::register(),
             commands::play_url::register(),
             commands::resume::register(),
+            commands::search::register(),
             commands::skip::register(),
         ];
 
