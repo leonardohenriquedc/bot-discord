@@ -1,11 +1,20 @@
-use serenity::{all::CommandInteraction, client::Context};
+use serenity::{
+    all::{Color, CommandInteraction, CreateEmbed, CreateInteractionResponseFollowup},
+    client::Context,
+};
 use songbird::{Event, TrackEvent};
 use tracing::{error, info, warn};
 
+use crate::commands::help::get_help_text;
 use crate::handlers::track_end::TrackEndNotifier;
-use crate::utils::response::{respond_to_command, respond_to_error};
+use crate::utils::response::respond_to_followup;
 
 pub async fn run(ctx: &Context, command: &CommandInteraction) {
+    if let Err(err) = command.defer(&ctx.http).await {
+        error!("Failed to defer join command: {}", err);
+        return;
+    }
+
     let guild_id = command.guild_id.unwrap();
     let user_id = {
         let member = command.member.as_ref().unwrap();
@@ -24,20 +33,24 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
     // Check if we successfully got the guild from cache
     if voice_channel_id.is_none() && ctx.cache.guild(guild_id).is_none() {
         error!("Failed to find guild {} in cache", guild_id);
-        respond_to_error(command, &ctx.http, format!("Error joining voice channel")).await;
+        let embed = CreateEmbed::new()
+            .description("Error joining voice channel")
+            .color(Color::DARK_RED);
+        respond_to_followup(command, &ctx.http, embed, false).await;
         return;
     }
 
     let connect_to = match voice_channel_id {
         Some(channel) => channel,
         None => {
-            warn!("User {} attempted to use /join but is not in a voice channel (guild {})", user_id, guild_id);
-            respond_to_error(
-                command,
-                &ctx.http,
-                format!("You're not in a voice channel!"),
-            )
-            .await;
+            warn!(
+                "User {} attempted to use /join but is not in a voice channel (guild {})",
+                user_id, guild_id
+            );
+            let embed = CreateEmbed::new()
+                .description("You're not in a voice channel!")
+                .color(Color::DARK_RED);
+            respond_to_followup(command, &ctx.http, embed, false).await;
 
             return;
         }
@@ -47,7 +60,10 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
         .await
         .expect("Songbird Voice client placed in at initialisation.");
 
-    info!("Attempting to join voice channel {} in guild {}", connect_to, guild_id);
+    info!(
+        "Attempting to join voice channel {} in guild {}",
+        connect_to, guild_id
+    );
 
     match manager.join(guild_id, connect_to).await {
         Ok(call) => {
@@ -66,19 +82,41 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) {
                 },
             );
 
-            info!("Successfully joined voice channel {} in guild {}", connect_to, guild_id);
+            info!(
+                "Successfully joined voice channel {} in guild {}",
+                connect_to, guild_id
+            );
 
-            respond_to_command(
-                command,
-                &ctx.http,
-                format!("Poor Jimmy **joined** the voice channel!"),
-                false,
-            )
-            .await;
+            // Send success message
+            let success_embed = CreateEmbed::new()
+                .description("Poor Jimmy **joined** the voice channel!")
+                .color(Color::DARK_GREEN);
+            respond_to_followup(command, &ctx.http, success_embed, false).await;
+
+            // Send help message as a second followup
+            let help_embed = CreateEmbed::new()
+                .description(get_help_text())
+                .color(Color::BLUE);
+
+            if let Err(err) = command
+                .create_followup(
+                    &ctx.http,
+                    CreateInteractionResponseFollowup::new().embed(help_embed),
+                )
+                .await
+            {
+                error!("Failed to send help followup: {}", err);
+            }
         }
         Err(err) => {
-            error!("Failed to join voice channel {} in guild {}: {}", connect_to, guild_id, err);
-            respond_to_error(command, &ctx.http, format!("Error joining voice channel!")).await;
+            error!(
+                "Failed to join voice channel {} in guild {}: {}",
+                connect_to, guild_id, err
+            );
+            let embed = CreateEmbed::new()
+                .description("Error joining voice channel!")
+                .color(Color::DARK_RED);
+            respond_to_followup(command, &ctx.http, embed, false).await;
         }
     }
 }
