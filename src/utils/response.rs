@@ -108,3 +108,24 @@ pub async fn respond_to_followup(
         error!("Failed to send followup response: {}", err);
     }
 }
+
+/// Respond to a deferred ComponentInteraction with the given
+/// CreateEmbed.
+///
+/// This assumes the component interaction has been deferred.
+pub async fn respond_to_followup_component(
+    interaction: &ComponentInteraction,
+    http: &Http,
+    content: CreateEmbed,
+    include_buttons: bool,
+) {
+    let mut message = CreateInteractionResponseFollowup::new().embed(content);
+
+    if include_buttons {
+        message = message.components(create_music_buttons());
+    }
+
+    if let Err(err) = interaction.create_followup(http, message).await {
+        error!("Failed to send followup response: {}", err);
+    }
+}

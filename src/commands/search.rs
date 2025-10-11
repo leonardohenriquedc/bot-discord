@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use serde::Deserialize;
 use serenity::{
     all::{
@@ -13,14 +11,13 @@ use serenity::{
 use tracing::{debug, error};
 
 use crate::{
-    handlers::track_play::TrackPlayHandler,
     utils::{
         response::{respond_to_error_button, respond_to_followup},
-        track_utils::TrackMetadata,
+        track_utils::enqueue_track_component,
         type_map::get_http_client,
     },
 };
-use songbird::{input::YoutubeDl, tracks::Track, Event, TrackEvent};
+use songbird::input::YoutubeDl;
 
 #[derive(Debug, Deserialize)]
 struct Thumbnail {
@@ -246,115 +243,13 @@ pub async fn handle_component(ctx: &Context, interaction: &ComponentInteraction)
     let http_client = get_http_client(ctx).await;
     let source = YoutubeDl::new(http_client, video_url);
 
-    // Create a pseudo-command interaction for enqueue_track
-    // We need to convert the ComponentInteraction to a CommandInteraction-like structure
-    // Since enqueue_track expects a CommandInteraction, we'll need to use the interaction
-    // Unfortunately, we can't directly convert, so we'll need to modify our approach
-
-    // Let's directly enqueue without using the helper for now
-    let guild_id = match interaction.guild_id {
-        Some(id) => id,
-        None => {
-            // Delete the loading message before sending error
-            if let Err(err) = interaction.delete_response(&ctx.http).await {
-                error!("Failed to delete loading message: {}", err);
-            }
-            respond_to_error_button(
-                interaction,
-                &ctx.http,
-                "This command can only be used in a server!".to_string(),
-            )
-            .await;
-            return;
-        }
-    };
-
-    let manager = songbird::get(&ctx)
-        .await
-        .expect("Songbird Voice client placed in at initialization.");
-
-    if let Some(call) = manager.get(guild_id) {
-        let mut handler = call.lock().await;
-        let mut source_input: songbird::input::Input = source.into();
-
-        // Get metadata
-        let metadata = match source_input.aux_metadata().await {
-            Ok(meta) => meta,
-            Err(err) => {
-                error!("Failed to fetch track metadata: {}", err);
-                Default::default()
-            }
-        };
-
-        let track_title = metadata
-            .title
-            .clone()
-            .unwrap_or_else(|| String::from("Unknown Track Title"));
-        let track_thumbnail = metadata.thumbnail.clone();
-        let track_duration = metadata.duration.clone();
-
-        // Create custom metadata
-        let custom_metadata = Arc::new(TrackMetadata {
-            title: track_title.clone(),
-            thumbnail_url: track_thumbnail.clone(),
-            duration: track_duration,
-        });
-
-        // Create and enqueue track
-        let track = handler
-            .enqueue(Track::new_with_data(source_input, custom_metadata))
-            .await;
-
-        let _ = track.add_event(
-            Event::Track(TrackEvent::Playable),
-            TrackPlayHandler {
-                channel_id: interaction.channel_id,
-                http: ctx.http.clone(),
-                title: track_title.clone(),
-                thumbnail: track_thumbnail.clone().unwrap_or_default(),
-            },
-        );
-
-        // Delete the loading message before sending the success message
-        if let Err(err) = interaction.delete_response(&ctx.http).await {
-            error!("Failed to delete loading message: {}", err);
-        }
-
-        let response_embed = CreateEmbed::default()
-            .description(format!("**Queued** {}!", track_title))
-            .color(Color::DARK_GREEN);
-
-        if let Err(err) = interaction
-            .create_followup(
-                &ctx.http,
-                serenity::builder::CreateInteractionResponseFollowup::new().embed(response_embed),
-            )
-            .await
-        {
-            error!("Failed to send followup message: {}", err);
-        }
-    } else {
-        // Delete the loading message before sending the error message
-        if let Err(err) = interaction.delete_response(&ctx.http).await {
-            error!("Failed to delete loading message: {}", err);
-        }
-
-        let response_embed = CreateEmbed::default()
-            .description(
-                "Error playing song! Ensure Poor Jimmy is in a voice channel with **/join**",
-            )
-            .color(Color::DARK_RED);
-
-        if let Err(err) = interaction
-            .create_followup(
-                &ctx.http,
-                serenity::builder::CreateInteractionResponseFollowup::new().embed(response_embed),
-            )
-            .await
-        {
-            error!("Failed to send error message: {}", err);
-        }
+    // Delete the loading message before enqueueing
+    if let Err(err) = interaction.delete_response(&ctx.http).await {
+        error!("Failed to delete loading message: {}", err);
     }
+
+    // Use the helper function to enqueue the track
+    enqueue_track_component(ctx, interaction, source.into()).await;
 }
 
 pub fn register() -> serenity::builder::CreateCommand {
