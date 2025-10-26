@@ -60,7 +60,7 @@ pub async fn enqueue_track(ctx: &Context, command: &CommandInteraction, mut sour
         let track = handler.enqueue(track_with_data).await;
 
         let _ = track.add_event(
-            songbird::Event::Track(songbird::TrackEvent::Playable),
+            songbird::Event::Track(songbird::TrackEvent::Play),
             TrackPlayHandler {
                 channel_id: command.channel_id,
                 http: ctx.http.clone(),

@@ -1,6 +1,7 @@
-use serenity::all::{Command, Interaction, Ready};
+use serenity::all::{Command, GuildId, Interaction, Ready};
 use serenity::async_trait;
 use serenity::client::{Context, EventHandler};
+use serenity::futures::stream::Cycle;
 use serenity::gateway::ActivityData;
 use serenity::model::user::OnlineStatus;
 use tracing::{debug, error, info};
@@ -68,7 +69,8 @@ impl EventHandler for BotEventHandler {
                     "skip" => commands::skip::handle_button(&ctx, &command).await,
                     _ => {
                         error!("Unknown button interaction received: {}", button_id);
-                        respond_to_error_button(&command, &ctx.http, format!("Unknown command!")).await;
+                        respond_to_error_button(&command, &ctx.http, format!("Unknown command!"))
+                            .await;
                     }
                 }
             }
@@ -97,7 +99,7 @@ impl EventHandler for BotEventHandler {
 
         info!("Registering {} slash commands globally...", commands.len());
 
-        match Command::set_global_commands(&ctx.http, commands).await {
+        /*match Command::set_global_commands(&ctx.http, commands).await {
             Ok(registered_commands) => {
                 info!(
                     "Successfully registered {} slash commands",
@@ -107,7 +109,11 @@ impl EventHandler for BotEventHandler {
             Err(err) => {
                 error!("Failed to register slash commands: {}", err);
             }
-        }
+        }*/
+
+        let guild_id = GuildId::new(936158860576686120);
+
+        let _ = guild_id.set_commands(&ctx.http, commands).await;
 
         ctx.set_presence(Some(ActivityData::listening("/play")), OnlineStatus::Online);
         info!("Bot is ready and listening for commands!");

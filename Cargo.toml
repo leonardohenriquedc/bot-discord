@@ -4,6 +4,7 @@ version = "2.0.0"
 edition = "2024"
 
 [dependencies]
+dotenv = "0.15.0"
 reqwest = "0.12"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -22,15 +23,15 @@ version = "0.5.4"
 version = "0.12.4"
 default-features = false
 features = [
-  "builder",
-  "cache",
-  "collector",
-  "client",
-  "gateway",
-  "model",
-  "rustls_backend",
-  "unstable_discord_api",
-  "voice",
+    "builder",
+    "cache",
+    "collector",
+    "client",
+    "gateway",
+    "model",
+    "rustls_backend",
+    "unstable_discord_api",
+    "voice",
 ]
 
 [dependencies.tokio]
