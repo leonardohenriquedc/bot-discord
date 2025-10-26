@@ -44,6 +44,7 @@ impl EventHandler for BotEventHandler {
                 "search" => commands::search::run(&ctx, &command).await,
                 "skip" => commands::skip::run(&ctx, &command).await,
                 "resume" => commands::resume::run(&ctx, &command).await,
+                "playlist" => commands::playlist::run(&ctx, &command).await,
                 _ => {
                     error!("Unknown command received: {}", command_name);
                     respond_to_error(&command, &ctx.http, format!("Unknown command!")).await;
@@ -95,6 +96,7 @@ impl EventHandler for BotEventHandler {
             commands::resume::register(),
             commands::search::register(),
             commands::skip::register(),
+            commands::playlist::register(),
         ];
 
         info!("Registering {} slash commands globally...", commands.len());
